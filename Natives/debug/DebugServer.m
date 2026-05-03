@@ -8,6 +8,8 @@
 #import <arpa/inet.h>
 #import <sys/sysctl.h>
 #import <sys/stat.h>
+#import <sys/mount.h>
+#import <sys/param.h>
 #import <dirent.h>
 #import <dlfcn.h>
 #import <mach-o/dyld.h>
