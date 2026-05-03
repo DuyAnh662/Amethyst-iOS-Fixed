@@ -63,16 +63,21 @@ done < <(find "$DEST_DIR" -type f -print0)
 
 echo "[jre25] retagged $RETAGGED Mach-O files ($SKIPPED skipped/failed)"
 
-# Sanity check: libjvm.dylib must exist and be Mach-O for iOS.
-if [ ! -f "$DEST_DIR/lib/libjvm.dylib" ]; then
-    echo "[jre25] ERROR: libjvm.dylib missing from $DEST_DIR/lib/"
-    exit 1
-fi
-
-if ! vtool -show "$DEST_DIR/lib/libjvm.dylib" 2>/dev/null | grep -q "platform IOS"; then
-    echo "[jre25] WARNING: libjvm.dylib platform tag may not be IOS"
-    vtool -show "$DEST_DIR/lib/libjvm.dylib" || true
-fi
+# Sanity check: libjvm.dylib lives at lib/server/ in modern OpenJDK,
+# libjli.dylib at lib/. Both must be present and retagged for iOS.
+JVM="$DEST_DIR/lib/server/libjvm.dylib"
+JLI="$DEST_DIR/lib/libjli.dylib"
+for required in "$JVM" "$JLI"; do
+    if [ ! -f "$required" ]; then
+        echo "[jre25] ERROR: required dylib missing: $required"
+        find "$DEST_DIR/lib" -name "libjvm*.dylib" -o -name "libjli*.dylib" 2>/dev/null
+        exit 1
+    fi
+    if ! vtool -show "$required" 2>/dev/null | grep -q "platform IOS"; then
+        echo "[jre25] WARNING: $required platform tag may not be IOS"
+        vtool -show "$required" || true
+    fi
+done
 
 rm -rf "$WORK_DIR"
 echo "[jre25] done. Final size:"
