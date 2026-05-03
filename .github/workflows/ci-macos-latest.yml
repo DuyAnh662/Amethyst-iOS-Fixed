@@ -51,8 +51,11 @@ jobs:
           xcrun --sdk iphoneos --show-sdk-version
           echo "SDKPATH=$SDKPATH"
 
-      - name: Build IPA + tIPA
-        run: gmake -j$(sysctl -n hw.ncpu) dsym package PLATFORM=2 TROLLSTORE_JIT_ENT=1
+      - name: Build sideload IPA (SideStore / personal cert)
+        run: gmake -j$(sysctl -n hw.ncpu) dsym package PLATFORM=2
+
+      - name: Build TrollStore tIPA
+        run: gmake -j$(sysctl -n hw.ncpu) package PLATFORM=2 TROLLSTORE_JIT_ENT=1
 
       - name: List artifacts
         if: always()
