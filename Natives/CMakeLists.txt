@@ -198,7 +198,6 @@ target_link_libraries(AngelAuraAmethyst
   "-framework CoreMotion"
   "-framework GameController"
   "-framework IOKit"
-  "-framework Network"
   "-framework QuartzCore"
   "-framework Security"
   "-framework UIKit"

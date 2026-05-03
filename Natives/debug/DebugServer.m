@@ -2,10 +2,11 @@
 #import "utils.h"
 
 #import <UIKit/UIKit.h>
-#import <Network/Network.h>
 #import <Security/Security.h>
 #import <ifaddrs.h>
 #import <arpa/inet.h>
+#import <sys/socket.h>
+#import <netinet/in.h>
 #import <sys/sysctl.h>
 #import <sys/stat.h>
 #import <sys/mount.h>
@@ -14,6 +15,12 @@
 #import <dlfcn.h>
 #import <mach-o/dyld.h>
 #import <unistd.h>
+#import <errno.h>
+#import <pthread.h>
+
+// Note: this server uses raw BSD sockets, NOT Network.framework. iOS Local
+// Network permission only gates NWBrowser/NWListener/Bonjour; raw socket()
+// + bind() + listen() bypasses that permission entirely.
 
 // Embedded HTML dashboard. Single page, vanilla JS, dark theme.
 static NSString *const kHTML = @"<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>Amethyst Debug</title><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><style>"
@@ -134,23 +141,25 @@ static NSString *contentTypeForPath(NSString *path) {
 #pragma mark - Per-connection handler
 
 @interface DebugConnection : NSObject
-@property (nonatomic) nw_connection_t conn;
+@property (nonatomic) int fd;
 @property (nonatomic, weak) DebugServer *server;
 @property (nonatomic) NSMutableData *buffer;
 @property (nonatomic) NSUInteger expectedBodyLength;
 @property (nonatomic) NSUInteger headerEndOffset;
-- (instancetype)initWithConnection:(nw_connection_t)conn server:(DebugServer *)server;
-- (void)start;
+- (instancetype)initWithFd:(int)fd server:(DebugServer *)server;
+- (void)run;
 @end
 
 #pragma mark - DebugServer
 
 @interface DebugServer ()
-@property (nonatomic) nw_listener_t listener;
-@property (nonatomic) dispatch_queue_t queue;
+@property (nonatomic) int listenFd;
+@property (nonatomic) dispatch_queue_t acceptQueue;
+@property (nonatomic) dispatch_queue_t connQueue;
 @property (nonatomic, copy) NSString *expectedToken;
 @property (nonatomic, readwrite) BOOL running;
 @property (nonatomic, readwrite) uint16_t boundPort;
+- (void)acceptLoop;
 @end
 
 @implementation DebugServer
@@ -179,57 +188,64 @@ static NSString *contentTypeForPath(NSString *path) {
         return NO;
     }
     self.expectedToken = [token copy];
-    self.queue = dispatch_queue_create("amethyst.debug.server", DISPATCH_QUEUE_SERIAL);
 
-    nw_parameters_t params = nw_parameters_create_secure_tcp(
-        NW_PARAMETERS_DISABLE_PROTOCOL,
-        NW_PARAMETERS_DEFAULT_CONFIGURATION);
-    nw_parameters_set_local_only(params, localhostOnly);
-    nw_parameters_set_reuse_local_address(params, true);
-
-    if (localhostOnly) {
-        char portStr[8];
-        snprintf(portStr, sizeof portStr, "%u", port);
-        nw_endpoint_t local = nw_endpoint_create_host("127.0.0.1", portStr);
-        nw_parameters_set_local_endpoint(params, local);
-    }
-
-    char portStr[8];
-    snprintf(portStr, sizeof portStr, "%u", port);
-    nw_listener_t listener = nw_listener_create_with_port(portStr, params);
-    if (!listener) {
-        NSLog(@"[DebugServer] Failed to create listener on port %u", port);
+    int s = socket(AF_INET, SOCK_STREAM, 0);
+    if (s < 0) {
+        NSLog(@"[DebugServer] socket() failed: %s", strerror(errno));
         return NO;
     }
-    nw_listener_set_queue(listener, self.queue);
+    int yes = 1;
+    setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
 
-    __weak DebugServer *weakSelf = self;
-    nw_listener_set_state_changed_handler(listener, ^(nw_listener_state_t state, nw_error_t error) {
-        if (state == nw_listener_state_failed) {
-            NSLog(@"[DebugServer] Listener failed: %@", error ? (__bridge NSError *)nw_error_copy_cf_error(error) : nil);
-            weakSelf.running = NO;
-        } else if (state == nw_listener_state_ready) {
-            NSLog(@"[DebugServer] Listening on %@", weakSelf.displayURL);
-        }
-    });
-    nw_listener_set_new_connection_handler(listener, ^(nw_connection_t conn) {
-        DebugConnection *c = [[DebugConnection alloc] initWithConnection:conn server:weakSelf];
-        [c start];
-    });
-    nw_listener_start(listener);
+    struct sockaddr_in addr = {0};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    addr.sin_addr.s_addr = localhostOnly ? htonl(INADDR_LOOPBACK) : INADDR_ANY;
 
-    self.listener = listener;
+    if (bind(s, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        NSLog(@"[DebugServer] bind(:%u) failed: %s", port, strerror(errno));
+        close(s);
+        return NO;
+    }
+    if (listen(s, 16) < 0) {
+        NSLog(@"[DebugServer] listen() failed: %s", strerror(errno));
+        close(s);
+        return NO;
+    }
+
+    self.listenFd = s;
     self.boundPort = port;
     self.running = YES;
+    self.acceptQueue = dispatch_queue_create("amethyst.debug.accept", DISPATCH_QUEUE_SERIAL);
+    self.connQueue = dispatch_queue_create("amethyst.debug.conn", DISPATCH_QUEUE_CONCURRENT);
+
+    dispatch_async(self.acceptQueue, ^{ [self acceptLoop]; });
+
+    NSLog(@"[DebugServer] Listening on %@", [self displayURL]);
     return YES;
 }
 
-- (void)stop {
-    if (self.listener) {
-        nw_listener_cancel(self.listener);
-        self.listener = nil;
+- (void)acceptLoop {
+    while (self.running) {
+        int client = accept(self.listenFd, NULL, NULL);
+        if (client < 0) {
+            if (!self.running) break;
+            usleep(50000);
+            continue;
+        }
+        dispatch_async(self.connQueue, ^{
+            DebugConnection *c = [[DebugConnection alloc] initWithFd:client server:self];
+            [c run];
+        });
     }
+}
+
+- (void)stop {
     self.running = NO;
+    if (self.listenFd > 0) {
+        close(self.listenFd);
+        self.listenFd = 0;
+    }
 }
 
 - (NSString *)displayURL {
@@ -243,48 +259,30 @@ static NSString *contentTypeForPath(NSString *path) {
 
 @implementation DebugConnection
 
-- (instancetype)initWithConnection:(nw_connection_t)conn server:(DebugServer *)server {
+- (instancetype)initWithFd:(int)fd server:(DebugServer *)server {
     if ((self = [super init])) {
-        _conn = conn;
+        _fd = fd;
         _server = server;
-        _buffer = [NSMutableData data];
+        _buffer = [NSMutableData dataWithCapacity:8192];
         _expectedBodyLength = NSUIntegerMax;
         _headerEndOffset = NSNotFound;
     }
     return self;
 }
 
-- (void)start {
-    nw_connection_set_queue(self.conn, dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0));
-    __weak DebugConnection *weakSelf = self;
-    nw_connection_set_state_changed_handler(self.conn, ^(nw_connection_state_t state, nw_error_t error) {
-        if (state == nw_connection_state_failed || state == nw_connection_state_cancelled) {
-            (void)weakSelf;
-        }
-    });
-    nw_connection_start(self.conn);
-    [self receive];
-}
-
-- (void)receive {
-    __weak DebugConnection *weakSelf = self;
-    nw_connection_receive(self.conn, 1, 64*1024,
-        ^(dispatch_data_t content, nw_content_context_t ctx, bool isComplete, nw_error_t error) {
-            DebugConnection *self0 = weakSelf;
-            if (!self0) return;
-            if (error || (!content && isComplete)) {
-                nw_connection_cancel(self0.conn);
-                return;
-            }
-            if (content) {
-                dispatch_data_apply(content, ^bool(dispatch_data_t region, size_t offset, const void *buf, size_t size) {
-                    [self0.buffer appendBytes:buf length:size];
-                    return true;
-                });
-            }
-            [self0 tryDispatch];
-            if (!isComplete) [self0 receive];
-        });
+- (void)run {
+    char chunk[8192];
+    while (self.fd > 0) {
+        ssize_t n = read(self.fd, chunk, sizeof(chunk));
+        if (n <= 0) break;
+        [self.buffer appendBytes:chunk length:(NSUInteger)n];
+        [self tryDispatch];
+        if (self.buffer.length > 32 * 1024 * 1024) break;
+    }
+    if (self.fd > 0) {
+        close(self.fd);
+        self.fd = 0;
+    }
 }
 
 - (void)tryDispatch {
@@ -606,15 +604,17 @@ static NSString *contentTypeForPath(NSString *path) {
     NSMutableData *out = [NSMutableData dataWithData:[headers dataUsingEncoding:NSUTF8StringEncoding]];
     if (body) [out appendData:body];
 
-    dispatch_data_t dd = dispatch_data_create(out.bytes, out.length,
-        dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0),
-        DISPATCH_DATA_DESTRUCTOR_DEFAULT);
-    __weak DebugConnection *weakSelf = self;
-    nw_connection_send(self.conn, dd, NW_CONNECTION_DEFAULT_MESSAGE_CONTEXT, true,
-        ^(nw_error_t error) {
-            if (error) NSLog(@"[DebugServer] send error");
-            nw_connection_cancel(weakSelf.conn);
-        });
+    if (self.fd <= 0) return;
+    const uint8_t *p = out.bytes;
+    size_t remaining = out.length;
+    while (remaining > 0) {
+        ssize_t w = write(self.fd, p, remaining);
+        if (w <= 0) break;
+        p += w;
+        remaining -= (size_t)w;
+    }
+    close(self.fd);
+    self.fd = 0;
 }
 
 @end
