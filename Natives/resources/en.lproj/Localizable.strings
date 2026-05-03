@@ -187,6 +187,11 @@
 "preference.title.renderer.debug.zink" = "Zink (Mesa 21.0) - exports OpenGL 4.1";
 "preference.title.renderer.debug.vulkan" = "MoltenVK - native Vulkan via Metal (1.21.6+ snapshots only)";
 
+"preference.title.debug_server_enabled" = "Debug HTTP server";
+"preference.detail.debug_server_enabled" = "Exposes a web panel on port 9090 for log tail, file browser, and game control. Token-protected. Toggle on to see the URL.";
+"preference.title.debug_server_localhost_only" = "Bind to localhost only";
+"preference.detail.debug_server_localhost_only" = "When ON, the debug server only accepts loopback connections (no LAN access). Turn OFF to connect from a desktop on the same WiFi.";
+
 "preference.detail.renderer" = "Change the OpenGL render engine to use. Zink is temporarily disabled on iOS 16 and later to diagnose issues.";
 
 "preference.title.resolution" = "Resolution (%)";

@@ -109,6 +109,8 @@ add_executable(AngelAuraAmethyst
   ctxbridges/gl_bridge.m
   ctxbridges/osm_bridge.m
   ctxbridges/vk_bridge.m
+
+  debug/DebugServer.m
  
   customcontrols/ControlButton.m
   customcontrols/ControlDrawer.m
@@ -196,7 +198,9 @@ target_link_libraries(AngelAuraAmethyst
   "-framework CoreMotion"
   "-framework GameController"
   "-framework IOKit"
+  "-framework Network"
   "-framework QuartzCore"
+  "-framework Security"
   "-framework UIKit"
   "-framework UniformTypeIdentifiers"
   "-framework UnzipKit"

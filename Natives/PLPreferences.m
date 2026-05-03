@@ -86,7 +86,11 @@
             @"debug_ipad_ui": @(realUIIdiom == UIUserInterfaceIdiomPad),
             @"debug_auto_correction": @YES,
             @"debug_show_layout_bounds": @NO,
-            @"debug_show_layout_overlap": @NO
+            @"debug_show_layout_overlap": @NO,
+            @"debug_server_enabled": @NO,
+            @"debug_server_port": @(9090),
+            @"debug_server_token": @"",
+            @"debug_server_localhost_only": @NO
         }.mutableCopy;
         defaults[@"warnings"] = @{
             @"local_warn": @YES,
