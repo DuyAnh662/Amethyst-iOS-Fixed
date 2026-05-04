@@ -69,6 +69,29 @@ jobs:
           chmod +x ios-arm64-clang ios-arm64-clang++ macos-host-cc
           chmod +x *.sh
 
+      - name: Patch OpenJDK build script to run our fixups after git apply
+        working-directory: openjdk-build
+        run: |
+          # Inject our fixup script into 6_buildjdk.sh so it runs after the
+          # JDK 21 base patch is applied (with --reject) and before configure.
+          # The base patch will leave .rej files for hunks that don't apply;
+          # our fixup script handles those targeted at JDK 25 source layout.
+          python3 -c "
+          import re
+          with open('6_buildjdk.sh','r') as f: s = f.read()
+          inject = '''
+          # iOS JDK 25 fixups: apply targeted text replacements for hunks the
+          # JDK 21 base patch couldn'\\''t place because OpenJDK source moved.
+          if [[ \"\\\$BUILD_IOS\" == \"1\" ]] && [[ \"\\\$TARGET_VERSION\" == \"25\" ]]; then
+            python3 ../amethyst/scripts/jdk25_ios_fixups.py .
+          fi
+          '''
+          # Insert right after the patch-application block, before configure
+          s = s.replace('# rm -rf build', inject + '\n# rm -rf build')
+          with open('6_buildjdk.sh','w') as f: f.write(s)
+          "
+          grep -n "jdk25_ios_fixups" 6_buildjdk.sh || (echo "INJECTION FAILED"; exit 1)
+
       - name: Build iOS JDK 25
         working-directory: openjdk-build
         env:
