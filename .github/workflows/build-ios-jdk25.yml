@@ -47,12 +47,17 @@ jobs:
           xcrun --sdk iphoneos --show-sdk-path
           xcrun --sdk iphoneos --show-sdk-version
 
-      - name: Stage iOS-21 patches into iOS-25 slot
+      - name: Stage iOS-21 base patch into iOS-25 slot (skip mirror_mapping)
         working-directory: openjdk-build
         run: |
           mkdir -p patches/jre_25/ios
-          cp patches/jre_21/ios/*.diff patches/jre_25/ios/
-          # Allow our own additional patches to override / extend
+          # Phase 1: only the base iOS patch. Skip 2_mirror_mapping.diff (JIT
+          # support) — most of its hunks are in HotSpot share/code which moved
+          # heavily between JDK 21 and 25. JVM will run interpreted (-Xint
+          # slow) but functional. Mirror mapping comes back as a separate
+          # phase once the base build is green.
+          cp patches/jre_21/ios/1_jdk21u_ios.diff patches/jre_25/ios/
+          # Allow our own override / extension patches
           if [ -d ../amethyst/scripts/jdk25_ios_patches ]; then
             cp ../amethyst/scripts/jdk25_ios_patches/*.diff patches/jre_25/ios/ 2>/dev/null || true
           fi
