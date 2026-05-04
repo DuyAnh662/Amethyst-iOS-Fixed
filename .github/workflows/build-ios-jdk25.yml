@@ -1,0 +1,123 @@
+name: Build iOS JDK 25
+
+# Manually triggered (or via push to a special path) — OpenJDK builds take
+# 40-90 min on macos-14, so this is opt-in not auto.
+#
+# Strategy: lean on AngelAuraMC/angelauramc-openjdk-build's existing iOS
+# build infrastructure (judge/buildjre17-21-25 branch). They have iOS
+# patches for JDK 21 and Android patches for JDK 25 but no iOS-25 yet.
+# We use the JDK 21 iOS patches as a starting point against JDK 25 source —
+# expect some hunks to fail and require manual fixup as we iterate.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-ios-jdk25.yml'
+      - 'scripts/jdk25_ios_patches/**'
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 180
+    steps:
+      - name: Checkout amethyst (for any local patches)
+        uses: actions/checkout@v4
+        with:
+          path: amethyst
+
+      - name: Checkout AngelAuraMC openjdk-build
+        uses: actions/checkout@v4
+        with:
+          repository: AngelAuraMC/angelauramc-openjdk-build
+          ref: judge/buildjre17-21-25
+          path: openjdk-build
+
+      - name: Setup boot JDK (Zulu 24)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '24'
+
+      - name: Install build deps
+        run: |
+          brew update
+          brew install autoconf fontconfig ldid xquartz make wget
+          xcode-select -p
+          xcrun --sdk iphoneos --show-sdk-path
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: Stage iOS-21 patches into iOS-25 slot
+        working-directory: openjdk-build
+        run: |
+          mkdir -p patches/jre_25/ios
+          cp patches/jre_21/ios/*.diff patches/jre_25/ios/
+          # Allow our own additional patches to override / extend
+          if [ -d ../amethyst/scripts/jdk25_ios_patches ]; then
+            cp ../amethyst/scripts/jdk25_ios_patches/*.diff patches/jre_25/ios/ 2>/dev/null || true
+          fi
+          ls -la patches/jre_25/ios/
+
+      - name: Make scripts executable
+        working-directory: openjdk-build
+        run: |
+          chmod +x ios-arm64-clang ios-arm64-clang++ macos-host-cc
+          chmod +x *.sh
+
+      - name: Build iOS JDK 25
+        working-directory: openjdk-build
+        env:
+          BUILD_IOS: '1'
+          TARGET_VERSION: '25'
+          NDK_VERSION: r27c
+        run: |
+          export TARGET=aarch64-apple-ios
+          export TARGET_JDK=aarch64
+          # The judge branch's globals
+          bash 2_ci_build_global.sh 2>&1 | tee build.log
+
+      - name: Show last 200 lines of build log on failure
+        if: failure()
+        working-directory: openjdk-build
+        run: tail -200 build.log || true
+
+      - name: Find rejected patches on failure
+        if: failure()
+        working-directory: openjdk-build
+        run: |
+          echo "=== rejected hunks ==="
+          find openjdk-25 -name "*.rej" 2>/dev/null | head -20 | while read f; do
+            echo "--- $f ---"
+            cat "$f"
+          done
+
+      - name: Find built JRE
+        if: always()
+        working-directory: openjdk-build
+        run: |
+          find . -name "libjvm.dylib" -type f 2>/dev/null | head -5
+          find . -name "*.tar.xz" -type f 2>/dev/null | head -5
+
+      - name: Upload built JRE if successful
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jre25-ios-aarch64
+          path: openjdk-build/**/*.tar.xz
+          if-no-files-found: warn
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: openjdk-build/build.log
+          if-no-files-found: ignore
+
+      - name: Upload rejected patches on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rejected-patches
+          path: openjdk-build/openjdk-25/**/*.rej
+          if-no-files-found: ignore
