@@ -129,6 +129,15 @@ patch('src/hotspot/os/posix/signals_posix.cpp', [
      '#include "utilities/vmError.hpp"\n#include "os_bsd.hpp"\n\n#include <signal.h>\n#include <sys/mman.h>'),
 ])
 
+# 13. memMapPrinter_macosx.cpp — uses <mach/mach_vm.h> which iOS SDK marks
+#     "unsupported". Wrap the entire body in an extra iOS guard so it compiles
+#     to nothing on iOS. The NMT memory-map printing is non-essential.
+patch('src/hotspot/os/bsd/memMapPrinter_macosx.cpp', [
+    ("guard-out-on-ios",
+     "#if defined(__APPLE__)\n\n#include \"nmt/memMapPrinter.hpp\"",
+     "#include <TargetConditionals.h>\n#if defined(__APPLE__) && !TARGET_OS_IPHONE\n\n#include \"nmt/memMapPrinter.hpp\""),
+])
+
 # 12. icache_bsd_aarch64.hpp — wrap __clear_cache with iOS-compatible version
 #     using sys_icache_invalidate. JDK 25 has `initialize(int phase)` (vs
 #     plain `initialize()` in JDK 21), so context is slightly different.
