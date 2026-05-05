@@ -239,5 +239,31 @@ patch('make/modules/java.desktop/lib/ClientLibraries.gmk', [
      "TARGETS += $(BUILD_LIBFONTMANAGER)\n\nifeq ($(call isTargetOs, macosx_NOTIOS), true)\n  ##############################################################################\n  ## Build libosxui"),
 ])
 
+# 16. AwtLibraries.gmk — port the JDK 21 patch's libawt/lwawt iOS strategy:
+#     (a) BUILD_LIBAWT links macOS frameworks (ApplicationServices, Cocoa,
+#         OpenGL, JavaRuntimeSupport) that don't exist on iOS — change
+#         LIBS_macosx to LIBS_macosx_NOTIOS so iOS gets an empty link list.
+#     (b) The libawt_excludeFiles macosx ifeq excludes initIDs/img_colors
+#         only on real macOS (the iOS build needs them in libawt_headless).
+#     (c) libawt_headless is gated off for windows+macosx — flip the guard
+#         to macosx_NOTIOS so it builds on iOS instead.
+#     (d) BUILD_LIBAWT_LWAWT is the AppKit-using path; skip entirely on iOS
+#         since src/java.desktop/macosx is moved out and libosxapp doesn't
+#         exist on iOS.
+patch('make/modules/java.desktop/lib/AwtLibraries.gmk', [
+    ("libawt-exclude-files-macosx-only-real-mac",
+     "ifeq ($(call isTargetOs, macosx), true)\n  LIBAWT_EXCLUDE_FILES += initIDs.c img_colors.c\nendif",
+     "ifeq ($(call isTargetOs, macosx_NOTIOS), true)\n  LIBAWT_EXCLUDE_FILES += initIDs.c img_colors.c\nendif"),
+    ("libawt-libs-macosx-not-ios",
+     "    LIBS_aix := $(LIBDL), \\\n    LIBS_macosx := \\\n        -framework ApplicationServices \\\n        -framework AudioToolbox \\\n        -framework Cocoa \\\n        -framework JavaRuntimeSupport \\\n        -framework Metal \\\n        -framework OpenGL, \\",
+     "    LIBS_aix := $(LIBDL), \\\n    LIBS_macosx_NOTIOS := \\\n        -framework ApplicationServices \\\n        -framework AudioToolbox \\\n        -framework Cocoa \\\n        -framework JavaRuntimeSupport \\\n        -framework Metal \\\n        -framework OpenGL, \\"),
+    ("libawt-headless-build-on-ios",
+     "# Mac and Windows only use the native AWT lib, do not build libawt_headless\nifeq ($(call isTargetOs, windows macosx), false)",
+     "# Mac and Windows only use the native AWT lib, do not build libawt_headless\n# (iOS gets libawt_headless because we skip the Cocoa-using libawt_lwawt)\nifeq ($(call isTargetOs, windows macosx_NOTIOS), false)"),
+    ("skip-libawt-lwawt-on-ios",
+     "ifeq ($(call isTargetOs, macosx), true)\n  ##############################################################################\n  ## Build libawt_lwawt",
+     "ifeq ($(call isTargetOs, macosx_NOTIOS), true)\n  ##############################################################################\n  ## Build libawt_lwawt"),
+])
+
 print(f"\nfixups: ok={ok} skip={skip} warn={warn}")
 sys.exit(1 if warn > 0 else 0)
