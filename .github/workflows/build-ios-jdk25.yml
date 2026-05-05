@@ -33,11 +33,11 @@ jobs:
           ref: judge/buildjre17-21-25
           path: openjdk-build
 
-      - name: Setup boot JDK (Zulu 24)
+      - name: Setup boot JDK (Temurin 25 — required to jlink JDK 25 jmods)
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
-          java-version: '24'
+          distribution: 'temurin'
+          java-version: '25'
 
       - name: Install build deps
         run: |
