@@ -70,31 +70,31 @@ jobs:
           chmod +x *.sh
 
       - name: Pre-scan JDK 25 source for known-bad iOS patterns
-        working-directory: openjdk-build
         run: |
           # Static analysis catches iOS-incompatible includes / API calls
-          # before we burn 13 min compiling. Doesn't replace fixups — it's
-          # a heads-up so we know what to expect / pre-empt.
-          if [ ! -d openjdk-25 ]; then
-            # source is cloned later in the build; just clone now to scan
-            git clone --depth 1 --branch jdk-25.0.1+8 https://github.com/openjdk/jdk25u openjdk-25
-          fi
+          # before we burn 13 min compiling. Clone to /tmp so the actual
+          # build's 5_clonejdk.sh can do its own clone undisturbed.
+          SCAN_DIR=/tmp/jdk25-scan
+          rm -rf "$SCAN_DIR"
+          git clone --depth 1 --branch jdk-25.0.1+8 https://github.com/openjdk/jdk25u "$SCAN_DIR" 2>&1 | tail -3
+          cd "$SCAN_DIR"
           echo "=== files including <mach/mach_vm.h> ==="
-          grep -rn '#include\s*<mach/mach_vm.h>' openjdk-25/src 2>/dev/null | head -10 || echo "(none)"
+          grep -rn '#include\s*<mach/mach_vm.h>' src 2>/dev/null || echo "(none)"
           echo ""
           echo "=== files including <sys/proc_info.h> ==="
-          grep -rn '#include\s*<sys/proc_info.h>' openjdk-25/src 2>/dev/null | head -10 || echo "(none)"
+          grep -rn '#include\s*<sys/proc_info.h>' src 2>/dev/null || echo "(none)"
           echo ""
-          echo "=== mach_vm_* call sites (potential iOS issue) ==="
-          grep -rn 'mach_vm_allocate\|mach_vm_deallocate\|mach_vm_protect' openjdk-25/src 2>/dev/null | head -10 || echo "(none)"
+          echo "=== mach_vm_* / mach_port_t / host_priv_t call sites ==="
+          grep -rln 'mach_vm_allocate\|mach_vm_deallocate\|mach_vm_protect\|mach_vm_region' src 2>/dev/null | head -20 || echo "(none)"
           echo ""
-          echo "=== files with __APPLE__ guard but no TARGET_OS_IPHONE ==="
-          # crude heuristic — files that test __APPLE__ but never mention iOS
-          for f in $(grep -rln '__APPLE__' openjdk-25/src 2>/dev/null); do
+          echo "=== macOS-only frameworks referenced ==="
+          grep -rln 'AppKit\.h\|Cocoa\.h\|Carbon\.h' src 2>/dev/null | head -10 || echo "(none)"
+          echo ""
+          echo "=== files w/ __APPLE__ but no TARGET_OS_IPHONE in BSD paths ==="
+          for f in $(grep -rln '__APPLE__' src 2>/dev/null); do
             if ! grep -q 'TARGET_OS_IPHONE\|TARGET_OS_OSX' "$f" 2>/dev/null; then
-              # filter to files in macOS/BSD-specific paths (more likely to fail)
               case "$f" in
-                */os/bsd/*|*macosx*|*_bsd*) echo "  $f" ;;
+                src/hotspot/os/bsd/*|*macosx*|*_bsd*) echo "  $f" ;;
               esac
             fi
           done | head -20
