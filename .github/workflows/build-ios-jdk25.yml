@@ -92,7 +92,9 @@ jobs:
           # versions. Bails out non-zero on a missing pattern (see WARN).
           if [[ "$BUILD_IOS" == "1" ]] && [[ "$TARGET_VERSION" == "25" ]]; then
             echo "[fixups] running jdk25_ios_fixups.py..."
-            python3 ../amethyst/scripts/jdk25_ios_fixups.py .
+            # 6_buildjdk.sh has cd'd into openjdk-25/ (i.e. openjdk-build/openjdk-25/),
+            # so amethyst checkout is two levels up.
+            python3 ../../amethyst/scripts/jdk25_ios_fixups.py .
           fi
 
           '''
