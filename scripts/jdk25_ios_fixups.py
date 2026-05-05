@@ -229,5 +229,15 @@ def patch_awtlibraries():
     ok += 1
 patch_awtlibraries()
 
+# 15. ClientLibraries.gmk — JDK 25's libosxui block also depends on
+#     src/java.desktop/macosx sources (Metal shaders + AquaFileView etc.)
+#     which we move to macosx_NOTIOS. Skip the entire macosx libosxui block
+#     by changing its outer ifeq to macosx_NOTIOS.
+patch('make/modules/java.desktop/lib/ClientLibraries.gmk', [
+    ("skip-libosxui-on-ios",
+     "TARGETS += $(BUILD_LIBFONTMANAGER)\n\nifeq ($(call isTargetOs, macosx), true)\n  ##############################################################################\n  ## Build libosxui",
+     "TARGETS += $(BUILD_LIBFONTMANAGER)\n\nifeq ($(call isTargetOs, macosx_NOTIOS), true)\n  ##############################################################################\n  ## Build libosxui"),
+])
+
 print(f"\nfixups: ok={ok} skip={skip} warn={warn}")
 sys.exit(1 if warn > 0 else 0)
