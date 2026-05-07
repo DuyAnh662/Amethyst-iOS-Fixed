@@ -285,6 +285,16 @@ patch('make/modules/java.desktop/lib/AwtLibraries.gmk', [
 #     standard Apple API pthread_jit_write_protect_np() back in. It works
 #     correctly on iOS 26 + TXM when the process holds JIT entitlement
 #     (StikDebug provides this). Also include <pthread.h> for the prototype.
+# 17. atomic.hpp needs `#include "os_bsd.hpp"` so mirror_w / mirror_x macros
+#     are visible. The mirror_mapping patch's hunk for this file rejected
+#     because JDK 25 has additional includes (utilities/checkedCast.hpp)
+#     that shifted the context. Add the include manually.
+patch('src/hotspot/share/runtime/atomic.hpp', [
+    ("add-os-bsd-include-for-mirror-macros",
+     "#include \"utilities/macros.hpp\"\n\n#include <type_traits>",
+     "#include \"utilities/macros.hpp\"\n\n#ifdef __APPLE__\n#include \"os_bsd.hpp\"\n#endif\n\n#include <type_traits>"),
+])
+
 # NOTE: pthread_jit_write_protect_np is marked "unavailable: not available on iOS"
 # in the iOS SDK headers, AND it shares the underlying APRR mechanism with
 # tcg-apple-jit.h's jit_write_protect — both no-op on TXM devices like iPhone 17.

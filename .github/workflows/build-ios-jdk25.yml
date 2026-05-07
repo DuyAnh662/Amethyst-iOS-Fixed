@@ -133,7 +133,9 @@ jobs:
               indent + "  echo \"[fuzz-fallback] retrying ${r%.rej}\"\n" +
               indent + "  patch -p1 -F 100 --ignore-whitespace < \"$r\" 2>&1 | tail -3 || echo \"  still failed\"\n" +
               indent + "done\n" +
-              indent + "find . -name '*.rej' -delete 2>/dev/null || true\n"
+              # Run our own .rej applier — context-based find/replace, more\n" +
+              # aggressive than `patch` because it searches the whole file.\n" +
+              indent + "python3 ../../amethyst/scripts/apply_rejs.py . || true\n"
           )
           s = s[:m.end()] + fuzz_block + s[m.end():]
 
