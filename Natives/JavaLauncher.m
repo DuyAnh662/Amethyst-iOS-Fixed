@@ -278,14 +278,6 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
     if (@available(iOS 26.0, *)) {
         if (!isJava25Home) {
             margv[++margc] = "-XX:+MirrorMappedCodeCache";
-        } else {
-            // Our iOS Java 25 build doesn't have mirror_mapping yet
-            // (Phase 2 work). Patch 1 removed pthread_jit_write_protect_np
-            // expecting mirror_mapping to replace it; without that, JIT'd
-            // code in MAP_JIT pages can't transition to executable and
-            // call_stub SIGBUSes on first JIT entry. Force interpreter
-            // mode until mirror_mapping lands. Slow but functional.
-            margv[++margc] = "-Xint";
         }
     }
 
