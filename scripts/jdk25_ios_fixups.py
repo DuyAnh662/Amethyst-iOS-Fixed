@@ -19,9 +19,11 @@ os.chdir(JDK)
 ok = warn = skip = 0
 
 
-def patch(path, transformations):
+def patch(path, transformations, replace_all=False):
     """Apply (old_text, new_text) tuples to file. Each transformation is
-    independent — reports per file at end."""
+    independent — reports per file at end. If replace_all=True, every
+    occurrence of `old` is replaced (use for patterns that recur in the
+    same file like nmethod.cpp's many `(this)` write sites)."""
     global ok, warn, skip
     p = Path(path)
     if not p.exists():
@@ -35,8 +37,9 @@ def patch(path, transformations):
             file_status.append(f"skip:{label}")
             continue
         if old in s:
-            s = s.replace(old, new, 1)
-            file_status.append(f"ok:{label}")
+            n = s.count(old) if replace_all else 1
+            s = s.replace(old, new) if replace_all else s.replace(old, new, 1)
+            file_status.append(f"ok:{label}({n}x)" if replace_all else f"ok:{label}")
         else:
             file_status.append(f"WARN:{label}")
     if s != original:
@@ -387,6 +390,166 @@ patch('src/hotspot/share/code/codeBlob.cpp', [
      "\n"
      "  return mirror_x(blob);\n"
      "}"),
+])
+
+# 20. heap.hpp — CRITICAL: HeapBlock header writes that go through the X-only
+#     mirror cause SIGBUS at CodeHeap::allocate during VM init (the very first
+#     stub allocation). v3 confirmed this: SIGBUS at libjvm.dylib+0x48cbbc
+#     in CodeHeap::allocate+0x16c, called from BufferBlob::create →
+#     CodeCache::allocate → CodeHeap::allocate, faulting on the freshly-mapped
+#     code-cache page. Wrap _header._length / _header._used writes in mirror_w.
+#     JDK 25's set_length uses checked_cast<uint32_t>(length) (JDK 21 had bare
+#     length) so the patch text needed adjustment.
+patch('src/hotspot/share/memory/heap.hpp', [
+    ("heapblock-set-length-mirror-w",
+     "    _header._length = checked_cast<uint32_t>(length);",
+     "    mirror_w(&_header)->_length = checked_cast<uint32_t>(length);"),
+    ("heapblock-set-used-mirror-w",
+     "  void set_used()                                { _header._used = true; }",
+     "  void set_used()                                { mirror_w(&_header)->_used = true; }"),
+    ("heapblock-set-free-mirror-w",
+     "  void set_free()                                { _header._used = false; }",
+     "  void set_free()                                { mirror_w(&_header)->_used = false; }"),
+])
+
+# 21. codeBlob.hpp — header_begin + adjust_size. JDK 25 has fewer fields in
+#     adjust_size (only _size and _data_offset; JDK 21 had four). header_begin
+#     returns mirror_x(this) so all derived address methods (content_end,
+#     code_end, data_begin) inherit the X-mirror automatically.
+patch('src/hotspot/share/code/codeBlob.hpp', [
+    ("header-begin-mirror-x",
+     "address    header_begin() const             { return (address)    this; }",
+     "address    header_begin() const             { return (address)    mirror_x(this); }"),
+    ("adjust-size-mirror-w-set",
+     "  void adjust_size(size_t used) {\n"
+     "    _size = (int)used;\n"
+     "    _data_offset = _size;\n"
+     "  }",
+     "  void adjust_size(size_t used) {\n"
+     "    mirror_w_set(_size) = (int)used;\n"
+     "    mirror_w_set(_data_offset) = _size;\n"
+     "  }"),
+])
+
+# 22. nmethod.cpp — wrap `this` in mirror_x at every code-cache write/dispatch
+#     site. The JDK 21 mirror_mapping hunks use big multi-line context that
+#     doesn't fit JDK 25's reorganized constructors. Every callsite is the
+#     same conceptual change though, so use replace_all on each pattern.
+#     12 substitutions total across 9 distinct patterns.
+patch('src/hotspot/share/code/nmethod.cpp', [
+    ("copy-code-and-locs-to-this",
+     "code_buffer->copy_code_and_locs_to(this)",
+     "code_buffer->copy_code_and_locs_to(mirror_x(this))"),
+    ("copy-values-to-this",
+     "code_buffer->copy_values_to(this)",
+     "code_buffer->copy_values_to(mirror_x(this))"),
+    ("debug-info-copy-to-this",
+     "debug_info->copy_to(this)",
+     "debug_info->copy_to(mirror_x(this))"),
+    ("dependencies-copy-to-this",
+     "dependencies->copy_to(this)",
+     "dependencies->copy_to(mirror_x(this))"),
+    ("handler-table-copy-to-this",
+     "handler_table->copy_to(this)",
+     "handler_table->copy_to(mirror_x(this))"),
+    ("nul-chk-table-copy-to-this",
+     "nul_chk_table->copy_to(this)",
+     "nul_chk_table->copy_to(mirror_x(this))"),
+    ("register-nmethod-this",
+     "Universe::heap()->register_nmethod(this)",
+     "Universe::heap()->register_nmethod(mirror_x(this))"),
+    ("verify-nmethod-this",
+     "Universe::heap()->verify_nmethod(this)",
+     "Universe::heap()->verify_nmethod(mirror_x(this))"),
+    ("codecache-commit-this",
+     "CodeCache::commit(this)",
+     "CodeCache::commit(mirror_x(this))"),
+], replace_all=True)
+
+# 23. codeBuffer.cpp — three sites the JDK 21 mirror_mapping patch couldn't
+#     place on JDK 25:
+#     a) expand() zaps the OLD buffer's _total_start (in code cache). Without
+#        mirror_w the debug-only fill_to_bytes writes to RX → SIGBUS. JDK 25
+#        also renamed `debug_only` → `DEBUG_ONLY` (uppercase macro).
+#     b) AsmRemarks::clear and ::share write _remarks (a CodeBlob member, in
+#        code cache). JDK 25 added `_remarks != nullptr &&` to the check, so
+#        the surrounding context differs from the JDK 21 hunk.
+#     c) Same pattern for DbgStrings::_strings.
+patch('src/hotspot/share/asm/codeBuffer.cpp', [
+    ("expand-zap-mirror-w",
+     "DEBUG_ONLY(Copy::fill_to_bytes(bxp->_total_start, bxp->_total_size,",
+     "DEBUG_ONLY(Copy::fill_to_bytes(mirror_w(bxp->_total_start), bxp->_total_size,"),
+    ("asmremarks-share-mirror-w-set",
+     "void AsmRemarks::share(const AsmRemarks &src) {\n"
+     "  precond(_remarks == nullptr || is_empty());\n"
+     "  clear();\n"
+     "  _remarks = src._remarks->reuse();\n"
+     "}",
+     "void AsmRemarks::share(const AsmRemarks &src) {\n"
+     "  precond(_remarks == nullptr || is_empty());\n"
+     "  clear();\n"
+     "  mirror_w_set(_remarks) = src._remarks->reuse();\n"
+     "}"),
+    ("asmremarks-clear-mirror-w-set",
+     "  if (_remarks != nullptr && _remarks->clear() == 0) {\n"
+     "    delete _remarks;\n"
+     "  }\n"
+     "  _remarks = nullptr;",
+     "  if (_remarks != nullptr && _remarks->clear() == 0) {\n"
+     "    delete _remarks;\n"
+     "  }\n"
+     "  mirror_w_set(_remarks) = nullptr;"),
+    ("dbgstrings-share-mirror-w-set",
+     "void DbgStrings::share(const DbgStrings &src) {\n"
+     "  precond(_strings == nullptr || is_empty());\n"
+     "  clear();\n"
+     "  _strings = src._strings->reuse();\n"
+     "}",
+     "void DbgStrings::share(const DbgStrings &src) {\n"
+     "  precond(_strings == nullptr || is_empty());\n"
+     "  clear();\n"
+     "  mirror_w_set(_strings) = src._strings->reuse();\n"
+     "}"),
+    ("dbgstrings-clear-mirror-w-set",
+     "  if (_strings != nullptr && _strings->clear() == 0) {\n"
+     "    delete _strings;\n"
+     "  }\n"
+     "  _strings = nullptr;",
+     "  if (_strings != nullptr && _strings->clear() == 0) {\n"
+     "    delete _strings;\n"
+     "  }\n"
+     "  mirror_w_set(_strings) = nullptr;"),
+])
+
+# 24. stubs.cpp — _stub_buffer holds the start of the stub region inside a
+#     BufferBlob. JDK 21 wrapped `blob->content_begin()`; JDK 25 first aligns
+#     the address into a local `aligned_start` and stores that. Wrap the
+#     stored value in mirror_x so StubQueue uses the X-mirror to read out
+#     stub bodies for execution.
+patch('src/hotspot/share/code/stubs.cpp', [
+    ("stub-buffer-mirror-x",
+     "_stub_buffer     = aligned_start;",
+     "_stub_buffer     = mirror_x(aligned_start);"),
+])
+
+# 25. dependencies.cpp — Dependencies::copy_to(nmethod*) writes the dependency
+#     table into the nmethod's body region. JDK 25 uses memcpy instead of
+#     JDK 21's Copy::disjoint_words. The destination `beg` is in code cache,
+#     so wrap in mirror_w.
+patch('src/hotspot/share/code/dependencies.cpp', [
+    ("dependencies-copy-to-mirror-w",
+     "(void)memcpy(beg, content_bytes(), size_in_bytes());",
+     "(void)memcpy(mirror_w(beg), content_bytes(), size_in_bytes());"),
+])
+
+# 26. deoptimization.cpp — DeoptimizationScope::mark writes the deopt
+#     generation counter onto an nmethod field. JDK 21 named the parameter
+#     `cm` (CompiledMethod*); JDK 25 renamed to `nm` (nmethod*). Same mirror_w
+#     treatment, just different variable name.
+patch('src/hotspot/share/runtime/deoptimization.cpp', [
+    ("deopt-mark-generation-mirror-w",
+     "  nm->_deoptimization_generation = DeoptimizationScope::_active_deopt_gen;",
+     "  mirror_w(nm)->_deoptimization_generation = DeoptimizationScope::_active_deopt_gen;"),
 ])
 
 # NOTE: pthread_jit_write_protect_np is marked "unavailable: not available on iOS"
