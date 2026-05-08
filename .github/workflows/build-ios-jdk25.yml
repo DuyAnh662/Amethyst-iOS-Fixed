@@ -121,12 +121,17 @@ jobs:
           #     mature; finds shifted hunks via context matching. This
           #     auto-resolves the bulk of mirror_mapping rejections.
           fuzz_marker = "echo \"Applying {}\" && git apply"
-          # Find the line containing the xargs invocation and insert AFTER it
+          # Find the line containing the iOS xargs invocation and insert AFTER it.
+          # 6_buildjdk.sh has TWO xargs lines: one for Android in `if "$BUILD_IOS" != "1"`,
+          # one for iOS in the `else`. We want the iOS one, so the regex requires `/ios/`.
           import re
-          xargs_line_re = re.compile(r"^([ \t]*)find \.\./patches/jre.*\.diff.*xargs.*$", re.MULTILINE)
-          m = xargs_line_re.search(s)
-          assert m, "could not locate xargs patch-apply line"
+          xargs_line_re = re.compile(r"^([ \t]*)find \.\./patches/jre[^\n]*ios[^\n]*\.diff[^\n]*xargs[^\n]*$", re.MULTILINE)
+          matches = list(xargs_line_re.finditer(s))
+          assert matches, "could not locate iOS xargs patch-apply line"
+          assert len(matches) == 1, f"expected exactly 1 iOS xargs line, found {len(matches)}"
+          m = matches[0]
           indent = m.group(1)
+          print(f"OK: located iOS xargs at offset {m.start()} indent={len(indent)} chars")
           # Single triple-quoted string so I can't accidentally break the
           # concat with stray comments. apply_rejs.py runs AFTER patch -F
           # 100 fuzz pass to pick up hunks neither got automatically.
