@@ -134,7 +134,7 @@ jobs:
               f"\n"
               f"{indent}# Fuzz-fallback: try patch -F 100 on each .rej from git apply\n"
               f"{indent}for r in $(find . -name '*.rej' 2>/dev/null); do\n"
-              f"{indent}  echo \"[fuzz-fallback] retrying ${{r%.rej}}\"\n"
+              f"{indent}  echo \"[fuzz-fallback] retrying $r\"\n"
               f"{indent}  patch -p1 -F 100 --ignore-whitespace < \"$r\" 2>&1 | tail -3 || echo \"  still failed\"\n"
               f"{indent}done\n"
               f"{indent}echo \"=== apply_rejs.py: aggressive context-shrink applier ===\"\n"
