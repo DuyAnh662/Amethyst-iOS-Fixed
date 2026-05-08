@@ -1,87 +1,100 @@
 #!/usr/bin/env python3
 """
-Aggressive .rej hunk applier for the JDK 25 iOS port.
+Aggressive .rej hunk applier with adaptive context shrinking.
 
-git apply --reject and patch -F 100 both refuse hunks when surrounding
-context doesn't match exactly. This tool reads each .rej file, extracts
-the (context + removed) lines as 'old' and (context + added) as 'new',
-then does str.replace on the target file. Works as long as the 'old'
-text is unique in the file — which it almost always is for the
-mechanical mirror_w/mirror_x substitutions in mirror_mapping.diff.
+Each hunk has context lines (' ' prefix) and change lines ('-' / '+').
+The ideal apply uses ALL context, but if the surrounding code shifted
+between versions (e.g. function signatures changed), full match fails.
+This tool tries progressively SHORTER context windows around the change
+until it finds a unique match in the target file.
 
-Usage:
-    python3 apply_rejs.py <openjdk-source-root>
-
-Walks the tree looking for *.rej files alongside their target file and
-attempts to apply each hunk. Reports per-hunk status. Exits non-zero
-if any hunk failed to apply (file untouched), so CI can flag it.
+Usage: python3 apply_rejs.py <openjdk-source-root>
 """
 import os, re, sys
 from pathlib import Path
 
-def parse_rej(rej_text: str):
-    """Yield (old_text, new_text) per hunk in a .rej file."""
-    hunk_re = re.compile(r'^@@ .*? @@.*$', re.MULTILINE)
-    # Split on hunk headers
-    parts = hunk_re.split(rej_text)
-    headers = hunk_re.findall(rej_text)
-    # parts[0] is the file-header preamble; parts[i+1] is the body for headers[i]
-    for i, body in enumerate(parts[1:]):
-        old_lines = []
-        new_lines = []
-        for line in body.split('\n'):
-            if line.startswith('-') and not line.startswith('---'):
-                old_lines.append(line[1:])
-            elif line.startswith('+') and not line.startswith('+++'):
-                new_lines.append(line[1:])
-            elif line.startswith(' '):
-                # context: present in both
-                old_lines.append(line[1:])
-                new_lines.append(line[1:])
-            elif line == '':
-                # blank line — context (may be present in source)
-                old_lines.append('')
-                new_lines.append('')
-            # Skip \ "no newline at end of file" markers
-        # Trim trailing blank lines from both (often spurious)
-        while old_lines and old_lines[-1] == '':
-            old_lines.pop()
-        while new_lines and new_lines[-1] == '':
-            new_lines.pop()
-        # Trim leading blank lines too
-        while old_lines and old_lines[0] == '':
-            old_lines.pop(0)
-        while new_lines and new_lines[0] == '':
-            new_lines.pop(0)
-        if not old_lines and not new_lines:
-            continue
-        yield '\n'.join(old_lines), '\n'.join(new_lines)
+HUNK_HEADER = re.compile(r'^@@ ', re.MULTILINE)
 
-def apply_hunks_to_file(target: Path, hunks):
-    """Apply (old, new) hunks to target. Returns (applied, failed) counts."""
-    if not target.exists():
-        return 0, len(list(hunks))
-    text = target.read_text()
-    applied = 0
-    failed_details = []
-    for i, (old, new) in enumerate(hunks):
-        if not old:
-            # Pure addition (no - or context lines): can't safely place.
-            failed_details.append(f"hunk {i+1}: pure addition without context")
+def parse_hunks(rej_text):
+    """Yield list of (kind, content) tuples per hunk. kind is '-', '+', or ' '."""
+    # Strip the first 'diff a/... b/...' line if present
+    parts = re.split(r'^@@.*?@@.*$', rej_text, flags=re.MULTILINE)
+    for body in parts[1:]:
+        hunk = []
+        for line in body.split('\n'):
+            if not line:
+                hunk.append((' ', ''))
+                continue
+            if line[0] in ('-', '+', ' '):
+                # Skip --- / +++ headers (shouldn't occur in body but safe)
+                if line.startswith('---') or line.startswith('+++'):
+                    continue
+                hunk.append((line[0], line[1:]))
+            elif line.startswith('\\'):
+                # `\ No newline at end of file` markers — ignore
+                continue
+            # else: unknown line, skip
+        # Trim trailing blank-context lines that often arrive from rej format
+        while hunk and hunk[-1] == (' ', ''):
+            hunk.pop()
+        while hunk and hunk[0] == (' ', ''):
+            hunk.pop(0)
+        if hunk:
+            yield hunk
+
+def try_apply_hunk(text, hunk):
+    """
+    Apply hunk to text. Try progressively shorter context windows.
+    Returns (new_text, status) where status is 'ok', 'ambiguous',
+    'no_match', or 'no_change'.
+    """
+    # Find boundary of change region (-/+ lines)
+    first_change = None
+    last_change = None
+    for i, (k, _) in enumerate(hunk):
+        if k != ' ':
+            if first_change is None:
+                first_change = i
+            last_change = i
+    if first_change is None:
+        return text, 'no_change'
+
+    n = len(hunk)
+    # Try each (leading_context_count, trailing_context_count) shrink from
+    # ALL the way down to 0+0. Outer iterations first try with more context.
+    max_lead = first_change            # lines 0..first_change-1
+    max_trail = n - 1 - last_change    # lines last_change+1..n-1
+
+    # Strategy: walk shrinking from full down to none, but always prefer
+    # MORE context (less aggressive shrinking) before LESS.
+    attempts = []
+    for ld in range(max_lead, -1, -1):
+        for tr in range(max_trail, -1, -1):
+            attempts.append((ld, tr))
+
+    last_ambiguous = None
+    for ld, tr in attempts:
+        window = hunk[max_lead - ld : last_change + 1 + tr]
+        old_lines = [c for k, c in window if k != '+']
+        new_lines = [c for k, c in window if k != '-']
+        if not old_lines:
             continue
-        count = text.count(old)
-        if count == 0:
-            # Try with normalized whitespace
-            failed_details.append(f"hunk {i+1}: 'old' text not found ({len(old)} chars)")
+        old_str = '\n'.join(old_lines)
+        new_str = '\n'.join(new_lines)
+        # Avoid trivial case where old==new (pure addition with no - lines)
+        if old_str == new_str and not any(k == '+' for k, _ in window):
             continue
-        if count > 1:
-            failed_details.append(f"hunk {i+1}: 'old' text matches {count} times — ambiguous")
-            continue
-        text = text.replace(old, new, 1)
-        applied += 1
-    if applied:
-        target.write_text(text)
-    return applied, failed_details
+        count = text.count(old_str)
+        if count == 1:
+            new_text = text.replace(old_str, new_str, 1)
+            return new_text, f'ok (lead={ld} trail={tr})'
+        elif count > 1:
+            last_ambiguous = (ld, tr, count)
+
+    if last_ambiguous:
+        return text, f'ambiguous ({last_ambiguous[2]}× at lead={last_ambiguous[0]} trail={last_ambiguous[1]})'
+    return text, 'no_match'
+
 
 def main():
     root = Path(sys.argv[1] if len(sys.argv) > 1 else '.')
@@ -89,30 +102,39 @@ def main():
     if not rejs:
         print(f"[apply_rejs] no .rej files under {root}")
         return 0
-    total_applied = 0
-    total_failed = 0
+    total_applied, total_failed = 0, 0
     for rej in rejs:
-        target = rej.with_suffix('')
-        # rej path is like .../foo.cpp.rej  → target is .../foo.cpp
-        # but rglob gives full path; .with_suffix strips ".rej" yielding "foo.cpp"
-        # Validate the target actually exists:
+        target = Path(str(rej)[:-4])  # strip .rej suffix
         if not target.exists():
             print(f"[apply_rejs] WARN target missing: {target}")
             continue
-        rel = target.relative_to(root) if target.is_absolute() else target
-        rej_text = rej.read_text()
-        hunks = list(parse_rej(rej_text))
-        applied, failed = apply_hunks_to_file(target, hunks)
-        total_applied += applied
-        total_failed += len(failed)
-        status = 'ok' if not failed else 'partial' if applied else 'fail'
-        print(f"[apply_rejs] {status:7} {rel}: {applied}/{len(hunks)} hunks applied")
-        for f in failed:
-            print(f"           {f}")
-        if not failed:
+        try:
+            rel = target.relative_to(root) if target.is_absolute() else target
+        except ValueError:
+            rel = target
+        text = target.read_text()
+        hunks = list(parse_hunks(rej.read_text()))
+        applied = 0
+        details = []
+        for i, hunk in enumerate(hunks, 1):
+            text, status = try_apply_hunk(text, hunk)
+            if status.startswith('ok'):
+                applied += 1
+            details.append((i, status))
+        if applied:
+            target.write_text(text)
+        ok_count = sum(1 for _, s in details if s.startswith('ok'))
+        fail_count = len(details) - ok_count
+        total_applied += ok_count
+        total_failed += fail_count
+        sym = 'ok' if fail_count == 0 else 'partial' if ok_count else 'fail'
+        print(f"[apply_rejs] {sym:7} {rel}: {ok_count}/{len(hunks)}")
+        for i, status in details:
+            if not status.startswith('ok'):
+                print(f"           hunk {i}: {status}")
+        if fail_count == 0:
             rej.unlink()
     print(f"[apply_rejs] TOTAL: {total_applied} applied, {total_failed} still failing")
-    # Don't fail CI here — let compile errors surface what's missing
     return 0
 
 if __name__ == '__main__':
