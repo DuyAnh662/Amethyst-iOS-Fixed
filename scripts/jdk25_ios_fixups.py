@@ -369,15 +369,101 @@ patch('src/hotspot/share/code/nmethod.hpp', [
      "  void     set_osr_link(nmethod *n) { mirror_w_set(_osr_link) = n; }"),
 ])
 
-# 29. nmethod.cpp try_transition uses Atomic::store(&_state, ...). The address
-#     `&_state` is derived from `this`, which is mirror_x'd after the JDK 21
-#     `nm = mirror_x(nm)` hunk applied via git apply. On TXM the X-mirror is
-#     RX-only so the atomic store SIGBUSes. Wrap with mirror_w() on the &_state
-#     so it points into the W-mirror.
+# 29. nmethod.cpp Atomic ops + direct field writes that fault when `this`
+#     is mirror_x. The JDK 21 hunk inserts `nm = mirror_x(nm);` in new_nmethod,
+#     so every method call on `nm` ends up with `this` = mirror_x. Any
+#     `Atomic::store(&_field, val)` or `_field = val` inside such methods
+#     writes via mirror_x → BUS_ADRALN on iOS 26 + TXM.
+#
+#     v6 fixed register_method's setters (set_has_*, try_transition's _state).
+#     v7 testing exposed nmethod::purge crashing at `_immutable_data = blob_end();`
+#     (libjvm.dylib+0x8529d8). Same shape applies to *all* Atomic ops on
+#     nmethod fields and all post-construction direct field writes — wrap them
+#     comprehensively here so we don't whack-a-mole one site at a time.
+#
+#     mirror_w is idempotent on already-W addresses (returns input unchanged),
+#     so wrapping `&_field` is safe whether `this` is mirror_w or mirror_x.
 patch('src/hotspot/share/code/nmethod.cpp', [
+    # try_transition's _state store (kept here for documentation; my earlier
+    # fixup already added this exact pair so it'll skip)
     ("try-transition-atomic-store-mirror-w",
      "  Atomic::store(&_state, new_state);",
      "  Atomic::store(mirror_w(&_state), new_state);"),
+    # nmethod::purge writes _immutable_data after free
+    ("purge-immutable-data-mirror-w-set",
+     "    _immutable_data = blob_end(); // Valid not null address",
+     "    mirror_w_set(_immutable_data) = blob_end(); // Valid not null address"),
+    # set_deoptimized_done's atomic store
+    ("set-deoptimized-done-mirror-w",
+     "    Atomic::store(&_deoptimization_status, deoptimize_done);",
+     "    Atomic::store(mirror_w(&_deoptimization_status), deoptimize_done);"),
+    # mark_as_maybe_on_stack — GC marks epoch
+    ("mark-on-stack-gc-epoch-mirror-w",
+     "  Atomic::store(&_gc_epoch, CodeCache::gc_epoch());",
+     "  Atomic::store(mirror_w(&_gc_epoch), CodeCache::gc_epoch());"),
+    # clear_unloading_state — GC clears unloading state
+    ("clear-unloading-state-mirror-w",
+     "  Atomic::store(&_is_unloading_state, state);",
+     "  Atomic::store(mirror_w(&_is_unloading_state), state);"),
+    # is_unloading state CAS (set_unloading_state-like path)
+    ("is-unloading-cmpxchg-mirror-w",
+     "Atomic::cmpxchg(&_is_unloading_state, state, new_state, memory_order_relaxed);",
+     "Atomic::cmpxchg(mirror_w(&_is_unloading_state), state, new_state, memory_order_relaxed);"),
+    # finalize_relocations creates _compiled_ic_data array
+    ("compiled-ic-data-mirror-w-set",
+     "    _compiled_ic_data = new CompiledICData[virtual_call_data.length()];",
+     "    mirror_w_set(_compiled_ic_data) = new CompiledICData[virtual_call_data.length()];"),
+    # oops_do_mark_link write
+    ("oops-do-mark-link-mirror-w-set",
+     "  _oops_do_mark_link = mark_link(old_head, claim_strong_done_tag);",
+     "  mirror_w_set(_oops_do_mark_link) = mark_link(old_head, claim_strong_done_tag);"),
+], replace_all=True)
+
+# 30. nmethod.cpp Atomic::cmpxchg on _exception_cache — appears in
+#     add_exception_cache_entry and clean_exception_cache. There are 3 sites
+#     all matching `Atomic::cmpxchg(&_exception_cache, X, Y)` with different
+#     args; replace_all of just the address part is the cleanest.
+patch('src/hotspot/share/code/nmethod.cpp', [
+    ("exception-cache-cmpxchg-addr-mirror-w",
+     "Atomic::cmpxchg(&_exception_cache,",
+     "Atomic::cmpxchg(mirror_w(&_exception_cache),"),
+    # oops_do_mark_link cmpxchg has 4 sites with different args, replace_all
+    # of the address part covers all of them.
+    ("oops-do-mark-link-cmpxchg-addr-mirror-w",
+     "Atomic::cmpxchg(&_oops_do_mark_link,",
+     "Atomic::cmpxchg(mirror_w(&_oops_do_mark_link),"),
+], replace_all=True)
+
+# 31. CodeBlob::purge — same problem class. The base class purge runs after
+#     nmethod::purge calls `CodeBlob::purge();`, with `this` still mirror_x'd.
+#     Four direct field writes need mirror_w_set. _oop_maps was already
+#     wrapped via the JDK 21 hunk that applied (the line is now
+#     `mirror_w_set(_oop_maps) = nullptr;`); the other three (_mutable_data,
+#     _mutable_data_size, _relocation_size) were not.
+patch('src/hotspot/share/code/codeBlob.cpp', [
+    ("codeblob-purge-mutable-data-mirror-w-set",
+     "    _mutable_data = blob_end(); // Valid not null address\n"
+     "    _mutable_data_size = 0;\n"
+     "    _relocation_size = 0;",
+     "    mirror_w_set(_mutable_data) = blob_end(); // Valid not null address\n"
+     "    mirror_w_set(_mutable_data_size) = 0;\n"
+     "    mirror_w_set(_relocation_size) = 0;"),
+])
+
+# 32. CodeBlob::set_oop_maps — assigns either a built ImmutableOopMapSet
+#     pointer or nullptr to _oop_maps. Called from nmethod ctor body and
+#     other places. The two assignments need mirror_w_set.
+patch('src/hotspot/share/code/codeBlob.cpp', [
+    ("codeblob-set-oop-maps-build-mirror-w-set",
+     "    _oop_maps = ImmutableOopMapSet::build_from(p);",
+     "    mirror_w_set(_oop_maps) = ImmutableOopMapSet::build_from(p);"),
+    ("codeblob-set-oop-maps-null-mirror-w-set",
+     "  } else {\n"
+     "    _oop_maps = nullptr;\n"
+     "  }",
+     "  } else {\n"
+     "    mirror_w_set(_oop_maps) = nullptr;\n"
+     "  }"),
 ])
 
 # 19. codeBlob.cpp: 3 hunks the JDK 21 mirror_mapping patch couldn't place
