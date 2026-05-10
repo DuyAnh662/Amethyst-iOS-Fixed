@@ -365,10 +365,14 @@ payload: native dep_mg java jre assets
 		ldid -S$(SOURCEDIR)/entitlements.sideload.xml $(OUTPUTDIR)/Payload/AngelAuraAmethyst.app/AngelAuraAmethyst; \
 	fi
 	chmod -R 755 $(OUTPUTDIR)/Payload
-	if [ '$(PLATFORM)' != '2' ]; then \
-		$(call METHOD_MACHO,$(OUTPUTDIR)/Payload/AngelAuraAmethyst.app,$(call METHOD_CHANGE_PLAT,$(PLATFORM),$$file)); \
-		$(call METHOD_MACHO,$(OUTPUTDIR)/java_runtimes,$(call METHOD_CHANGE_PLAT,$(PLATFORM),$$file)); \
-	fi
+	# Always run the platform retag — it's idempotent on already-iOS-tagged
+	# Mach-Os, and catches dylibs we drop in fresh from Maven (which ship
+	# tagged platform=macos and would be silently rejected by iOS dyld).
+	# Originally guarded by `[ PLATFORM != 2 ]` on the assumption that all
+	# committed dylibs were already iOS-tagged — that broke when v19 added
+	# the 3.3.5 lwjgl-stb dylib straight from upstream.
+	$(call METHOD_MACHO,$(OUTPUTDIR)/Payload/AngelAuraAmethyst.app,$(call METHOD_CHANGE_PLAT,$(PLATFORM),$$file)); \
+	$(call METHOD_MACHO,$(OUTPUTDIR)/java_runtimes,$(call METHOD_CHANGE_PLAT,$(PLATFORM),$$file));
 	echo '[Amethyst v$(VERSION)] payload - end'
 
 deploy:
