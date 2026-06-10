@@ -27,9 +27,9 @@ jobs:
           brew install make cmake wget xz
           # Install Zulu JDK 8 for ARM64 (openjdk@8 is x86_64 only)
           brew install --cask zulu@8
+          brew install libplist openssl
           git clone https://github.com/ProcursusTeam/ldid.git
           cd ldid
-          brew install openssl
           make -j$(sysctl -n hw.ncpu)
           sudo cp ldid /usr/local/bin/ldid
           cd ..
