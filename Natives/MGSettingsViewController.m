@@ -2,6 +2,7 @@
 #import "LauncherPreferences.h"
 #import "ios_uikit_bridge.h"
 #import "utils.h"
+#import <objc/runtime.h>
 
 @interface MGSettingsViewController () <UIPickerViewDataSource, UIPickerViewDelegate>
 
