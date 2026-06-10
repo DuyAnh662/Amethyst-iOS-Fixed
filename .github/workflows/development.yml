@@ -29,9 +29,18 @@ jobs:
       - name: Init nested submodules (MobileGlues dependencies)
         run: |
           cd Natives/external/MobileGlues
-          git submodule update --init --recursive --depth=1 --progress 2>&1
+          git config --local --add safe.directory "$PWD"
+          git submodule update --init --recursive --depth=1 --progress 2>&1 || {
+            echo "git submodule failed, cloning manually..."
+            git clone --depth=1 https://github.com/KhronosGroup/glslang.git MobileGlues-cpp/3rdparty/glslang
+            git clone --depth=1 https://github.com/KhronosGroup/SPIRV-Cross.git MobileGlues-cpp/3rdparty/SPIRV-Cross
+            git clone --depth=1 https://android.googlesource.com/platform/external/perfetto MobileGlues-cpp/3rdparty/perfetto
+            git clone --depth=1 https://github.com/stbrumme/xxhash.git MobileGlues-cpp/3rdparty/xxhash
+            git clone --depth=1 https://github.com/g-truc/glm.git MobileGlues-cpp/3rdparty/glm
+            git clone --depth=1 https://github.com/MobileGL-Dev/FastSTL.git MobileGlues-cpp/include/FastSTL
+          }
           echo "=== Verification ==="
-          ls -d MobileGlues-cpp/3rdparty/*/
+          ls -d MobileGlues-cpp/3rdparty/*/ MobileGlues-cpp/include/FastSTL/
 
       - name: Install dependencies
         run: |
