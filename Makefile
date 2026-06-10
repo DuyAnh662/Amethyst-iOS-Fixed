@@ -158,13 +158,18 @@ METHOD_PACKAGE = \
 # Function to download and unpack Java runtimes.
 METHOD_JAVA_UNPACK = \
 	cd $(SOURCEDIR)/depends; \
-	if [ ! -f "java-$(1)-openjdk/release" ] && [ ! -f "$(ls jre$(1)-*.tar.xz)" ]; then \
-		if [ "$(RUNNER)" != "1" ]; then \
-			wget '$(2)' -q --show-progress; \
-			unzip jre*-ios-aarch64.zip && rm jre*-ios-aarch64.zip; \
+	if [ ! -d "java-$(1)-openjdk" ]; then \
+		if [ "$(RUNNER)" != "1" ] && ! ls jre$(1)-*.tar.xz >/dev/null 2>&1; then \
+			wget '$(2)' -q --show-progress --retry-connrefused --tries 5 --timeout 30 && { \
+				unzip jre$(1)-ios-aarch64.zip && rm -f jre$(1)-ios-aarch64.zip; \
+			} || echo "[WARN] Failed to download JRE $(1), skipping..."; \
 		fi; \
-		mkdir -p java-$(1)-openjdk; \
-		tar xvf jre$(1)-*.tar.xz -C java-$(1)-openjdk; \
+		if ls jre$(1)-*.tar.xz >/dev/null 2>&1; then \
+			mkdir -p java-$(1)-openjdk; \
+			tar xf jre$(1)-*.tar.xz -C java-$(1)-openjdk; \
+		else \
+			echo "[WARN] No tarball for JRE $(1), skipping extraction"; \
+		fi \
 	fi
 
 # Function to codesign binaries.
@@ -286,23 +291,30 @@ java:
 jre: native
 	echo '[Amethyst v$(VERSION)] jre - start'
 	mkdir -p $(SOURCEDIR)/depends
-	cd $(SOURCEDIR)/depends; \
-	$(call METHOD_JAVA_UNPACK,8,'https://crystall1ne.dev/cdn/amethyst-ios/jre8-ios-aarch64.zip'); \
-	$(call METHOD_JAVA_UNPACK,17,'https://crystall1ne.dev/cdn/amethyst-ios/jre17-ios-aarch64.zip'); \
-	$(call METHOD_JAVA_UNPACK,21,'https://crystall1ne.dev/cdn/amethyst-ios/jre21-ios-aarch64.zip'); \
-	$(call METHOD_JAVA_UNPACK,25,'https://crystall1ne.dev/cdn/amethyst-ios/jre25-ios-aarch64.zip'); \
-	if [ -f "$(ls jre*.tar.xz)" ]; then rm $(SOURCEDIR)/depends/jre*.tar.xz; fi; \
+	$(call METHOD_JAVA_UNPACK,8,'https://crystall1ne.dev/cdn/amethyst-ios/jre8-ios-aarch64.zip')
+	$(call METHOD_JAVA_UNPACK,17,'https://crystall1ne.dev/cdn/amethyst-ios/jre17-ios-aarch64.zip')
+	$(call METHOD_JAVA_UNPACK,21,'https://crystall1ne.dev/cdn/amethyst-ios/jre21-ios-aarch64.zip')
+	$(call METHOD_JAVA_UNPACK,25,'https://crystall1ne.dev/cdn/amethyst-ios/jre25-ios-aarch64.zip')
+	ls jre*.tar.xz 2>/dev/null && rm -f $(SOURCEDIR)/depends/jre*.tar.xz || true
 	cd $(SOURCEDIR); \
-	rm -rf $(SOURCEDIR)/depends/java-*-openjdk/{ASSEMBLY_EXCEPTION,bin,include,jre,legal,LICENSE,man,THIRD_PARTY_README,lib/{ct.sym,jspawnhelper,libjsig.dylib,src.zip,tools.jar}}; \
-	$(call METHOD_DIRCHECK,$(OUTPUTDIR)/java_runtimes); \
-	cp -R $(POJAV_JRE8_DIR) $(OUTPUTDIR)/java_runtimes; \
-	cp -R $(POJAV_JRE17_DIR) $(OUTPUTDIR)/java_runtimes; \
-	cp -R $(POJAV_JRE21_DIR) $(OUTPUTDIR)/java_runtimes; \
-	cp -R $(POJAV_JRE25_DIR) $(OUTPUTDIR)/java_runtimes; \
-	cp $(WORKINGDIR)/libawt_xawt.dylib $(OUTPUTDIR)/java_runtimes/java-8-openjdk/lib; \
-	cp $(WORKINGDIR)/libawt_xawt.dylib $(OUTPUTDIR)/java_runtimes/java-17-openjdk/lib; \
-	cp $(WORKINGDIR)/libawt_xawt.dylib $(OUTPUTDIR)/java_runtimes/java-21-openjdk/lib; \
-	cp $(WORKINGDIR)/libawt_xawt.dylib $(OUTPUTDIR)/java_runtimes/java-25-openjdk/lib
+	for jdir in java-8-openjdk java-17-openjdk java-21-openjdk java-25-openjdk; do \
+		if [ -d "depends/$$jdir" ]; then \
+			rm -rf "depends/$$jdir/ASSEMBLY_EXCEPTION" "depends/$$jdir/bin" "depends/$$jdir/include" "depends/$$jdir/jre" "depends/$$jdir/legal" "depends/$$jdir/LICENSE" "depends/$$jdir/man" "depends/$$jdir/THIRD_PARTY_README" "depends/$$jdir/lib/ct.sym" "depends/$$jdir/lib/jspawnhelper" "depends/$$jdir/lib/libjsig.dylib" "depends/$$jdir/lib/src.zip" "depends/$$jdir/lib/tools.jar" 2>/dev/null || true; \
+		fi; \
+	done
+	$(call METHOD_DIRCHECK,$(OUTPUTDIR)/java_runtimes)
+	for jver in 8 17 21 25; do \
+		src="$(SOURCEDIR)/depends/java-$$jver-openjdk"; \
+		if [ -d "$$src" ]; then \
+			cp -R "$$src" $(OUTPUTDIR)/java_runtimes; \
+		fi; \
+	done
+	for jver in 8 17 21 25; do \
+		dst="$(OUTPUTDIR)/java_runtimes/java-$$jver-openjdk/lib"; \
+		if [ -d "$$dst" ]; then \
+			cp $(WORKINGDIR)/libawt_xawt.dylib "$$dst" 2>/dev/null || true; \
+		fi; \
+	done
 	echo '[Amethyst v$(VERSION)] jre - end'
 
 dep_mg:
