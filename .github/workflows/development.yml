@@ -30,7 +30,7 @@ jobs:
         run: |
           brew install make cmake wget xz
           # Install Zulu JDK 8 for ARM64 (openjdk@8 is x86_64 only)
-          brew install --cask zulu8
+          brew install --cask zulu@8
           # Install ldid from source (not in default brew)
           git clone https://github.com/ProcursusTeam/ldid.git
           cd ldid
