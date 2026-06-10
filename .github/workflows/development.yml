@@ -24,20 +24,32 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
         with:
-          submodules: recursive
+          submodules: false
+
+      - name: Init submodules (full depth for nested submodules)
+        run: |
+          git submodule update --init --recursive
 
       - name: Install dependencies
         run: |
-          brew install make cmake wget xz
+          export HOMEBREW_NO_ENV_HINTS=1
+          # Install only what's needed
+          command -v gmake &>/dev/null || brew install make
+          command -v cmake &>/dev/null || brew install cmake
+          command -v wget &>/dev/null || brew install wget
+          command -v xz &>/dev/null || brew install xz
           # Install Zulu JDK 8 for ARM64 (openjdk@8 is x86_64 only)
-          brew install --cask zulu@8
+          /usr/libexec/java_home -v 1.8 &>/dev/null || brew install --cask zulu@8
           # Install ldid from source (not in default brew)
-          brew install libplist openssl
-          git clone https://github.com/ProcursusTeam/ldid.git
-          cd ldid
-          make -j$(sysctl -n hw.ncpu)
-          sudo cp ldid /usr/local/bin/ldid
-          cd ..
+          brew install libplist openssl 2>&1 | grep -v "already installed"
+          command -v ldid &>/dev/null || {
+            git clone --depth=1 https://github.com/ProcursusTeam/ldid.git
+            cd ldid
+            make -j$(sysctl -n hw.ncpu)
+            sudo cp ldid /usr/local/bin/ldid
+            cd ..
+            rm -rf ldid
+          }
 
       - name: Select Xcode version
         run: |
