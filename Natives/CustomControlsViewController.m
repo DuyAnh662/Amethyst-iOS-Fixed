@@ -235,9 +235,9 @@
         UIMenuItem *actionDelete = [[UIMenuItem alloc] initWithTitle:localize(@"Remove", nil) action:@selector(actionMenuBtnDelete)];
         if ([sender.view isKindOfClass:[ControlDrawer class]]) {
             UIMenuItem *actionAddSubButton = [[UIMenuItem alloc] initWithTitle:localize(@"custom_controls.button_menu.add_subbutton", nil) action:@selector(actionMenuAddSubButton)];
-            [menuController setMenuItems:@[actionEdit, /* actionCopy, */ actionDelete, actionAddSubButton]];
+            [menuController setMenuItems:@[actionEdit, actionCopy, actionDelete, actionAddSubButton]];
         } else {
-            [menuController setMenuItems:@[actionEdit, /* actionCopy, */ actionDelete]];
+            [menuController setMenuItems:@[actionEdit, actionCopy, actionDelete]];
         }
         self.selectedPoint = sender.view.bounds;
     }
@@ -443,7 +443,63 @@
 }
 
 - (void)actionMenuBtnCopy {
-    // copy
+    self.resizeView.hidden = YES;
+    ControlButton *sourceButton = (ControlButton *)self.currentGesture.view;
+    NSString *copySuffix = localize(@"custom_controls.button_menu.copy_suffix", nil);
+    if (![copySuffix length]) copySuffix = @" (copy)";
+
+    if ([sourceButton isKindOfClass:[ControlDrawer class]]) {
+        ControlDrawer *drawer = (ControlDrawer *)sourceButton;
+        NSMutableDictionary *newData = [NSKeyedUnarchiver unarchiveObjectWithData:
+            [NSKeyedArchiver archivedDataWithRootObject:drawer.drawerData]];
+        newData[@"properties"][@"name"] = [NSString stringWithFormat:@"%@%@",
+            newData[@"properties"][@"name"], copySuffix];
+        ControlDrawer *newDrawer = [ControlDrawer buttonWithData:newData];
+        [newDrawer snapAndAlignX:drawer.frame.origin.x + 10 Y:drawer.frame.origin.y + 10];
+        [newDrawer update];
+        [self doAddButton:newDrawer atIndex:@([self.ctrlView.layoutDictionary[@"mDrawerDataList"] count])];
+        for (ControlSubButton *sub in newDrawer.buttons) {
+            [sub addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(showControlPopover:)]];
+            [sub addGestureRecognizer:[[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(onTouch:)]];
+        }
+        [newDrawer addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(showControlPopover:)]];
+        [newDrawer addGestureRecognizer:[[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(onTouch:)]];
+    } else if ([sourceButton isKindOfClass:[ControlSubButton class]]) {
+        ControlSubButton *sub = (ControlSubButton *)sourceButton;
+        NSMutableDictionary *newProps = [NSKeyedUnarchiver unarchiveObjectWithData:
+            [NSKeyedArchiver archivedDataWithRootObject:sub.properties]];
+        newProps[@"name"] = [NSString stringWithFormat:@"%@%@", newProps[@"name"], copySuffix];
+        ControlSubButton *newSub = [ControlSubButton buttonWithProperties:newProps];
+        newSub.parentDrawer = sub.parentDrawer;
+        [newSub snapAndAlignX:sub.frame.origin.x + 10 Y:sub.frame.origin.y + 10];
+        [newSub update];
+        [self doAddButton:newSub atIndex:@(sub.parentDrawer.buttons.count)];
+        [newSub addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(showControlPopover:)]];
+        [newSub addGestureRecognizer:[[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(onTouch:)]];
+    } else if ([sourceButton isKindOfClass:[ControlJoystick class]]) {
+        ControlJoystick *joy = (ControlJoystick *)sourceButton;
+        NSMutableDictionary *newProps = [NSKeyedUnarchiver unarchiveObjectWithData:
+            [NSKeyedArchiver archivedDataWithRootObject:joy.properties]];
+        if (joy.properties[@"name"]) {
+            newProps[@"name"] = [NSString stringWithFormat:@"%@%@", joy.properties[@"name"], copySuffix];
+        }
+        ControlJoystick *newJoy = [ControlJoystick buttonWithProperties:newProps];
+        [newJoy snapAndAlignX:joy.frame.origin.x + 10 Y:joy.frame.origin.y + 10];
+        [newJoy update];
+        [self doAddButton:newJoy atIndex:@([self.ctrlView.layoutDictionary[@"mJoystickDataList"] count])];
+        [newJoy addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(showControlPopover:)]];
+        [newJoy addGestureRecognizer:[[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(onTouch:)]];
+    } else {
+        NSMutableDictionary *newProps = [NSKeyedUnarchiver unarchiveObjectWithData:
+            [NSKeyedArchiver archivedDataWithRootObject:sourceButton.properties]];
+        newProps[@"name"] = [NSString stringWithFormat:@"%@%@", newProps[@"name"], copySuffix];
+        ControlButton *newButton = [ControlButton buttonWithProperties:newProps];
+        [newButton snapAndAlignX:sourceButton.frame.origin.x + 10 Y:sourceButton.frame.origin.y + 10];
+        [newButton update];
+        [self doAddButton:newButton atIndex:@([self.ctrlView.layoutDictionary[@"mControlDataList"] count])];
+        [newButton addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(showControlPopover:)]];
+        [newButton addGestureRecognizer:[[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(onTouch:)]];
+    }
 }
 
 - (void)actionMenuBtnDelete {

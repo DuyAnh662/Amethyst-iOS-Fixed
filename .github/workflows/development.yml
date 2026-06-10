@@ -28,12 +28,25 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install make cmake ldid wget xz
+          brew install make cmake wget xz openjdk@8
+          # Install ldid from source (not in default brew)
+          git clone https://github.com/ProcursusTeam/ldid.git
+          cd ldid
+          brew install openssl
+          make -j$(sysctl -n hw.ncpu)
+          sudo cp ldid /usr/local/bin/ldid
+          cd ..
+
+      - name: Select Xcode version
+        run: |
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcrun --sdk iphoneos --show-sdk-path
 
       - name: Build for ${{ matrix.platform_name }}
         run: |
-          export PATH=$(brew --prefix)/bin:$PATH
+          export PATH=$(brew --prefix)/bin:$(brew --prefix)/opt/openjdk@8/bin:$PATH
           export SLIMMED=1
+          export JAVA_HOME=$(brew --prefix)/opt/openjdk@8
           gmake -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }}
 
       - name: Upload regular ipa
