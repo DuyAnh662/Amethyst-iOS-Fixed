@@ -40,6 +40,22 @@ jobs:
           echo "=== Verification ==="
           ls -d MobileGlues-cpp/3rdparty/*/ MobileGlues-cpp/include/FastSTL/
 
+      - name: Download UnzipKit framework & headers
+        run: |
+          # Download and extract framework binary
+          curl -sL "https://github.com/abbeycode/UnzipKit/releases/download/1.9/UnzipKit.framework.zip" -o /tmp/UnzipKit.framework.zip
+          mkdir -p Natives/resources/Frameworks
+          unzip -oq /tmp/UnzipKit.framework.zip -d Natives/resources/Frameworks/
+          rm -f /tmp/UnzipKit.framework.zip
+          # Headers are gitignored at Natives/external/UnzipKit, fetch from source
+          UZK_COMMIT=61159ce86e02c429b790c0c45c9c0a3ea818ca39
+          mkdir -p Natives/external/UnzipKit
+          curl -sL "https://raw.githubusercontent.com/abbeycode/UnzipKit/$UZK_COMMIT/Source/UnzipKit.h" -o Natives/external/UnzipKit/UnzipKit.h
+          curl -sL "https://raw.githubusercontent.com/abbeycode/UnzipKit/$UZK_COMMIT/Source/UZKArchive.h" -o Natives/external/UnzipKit/UZKArchive.h
+          curl -sL "https://raw.githubusercontent.com/abbeycode/UnzipKit/$UZK_COMMIT/Source/UZKFileInfo.h" -o Natives/external/UnzipKit/UZKFileInfo.h
+          echo "=== UnzipKit installed ==="
+          ls -la Natives/external/UnzipKit/ Natives/resources/Frameworks/UnzipKit.framework/
+
       - name: Install dependencies
         run: |
           export HOMEBREW_NO_ENV_HINTS=1 HOMEBREW_NO_REQUIRE_TAP_TRUST=1
