@@ -1,4 +1,6 @@
 #import <UIKit/UIKit.h>
+#import <dlfcn.h>
+#import <dispatch/dispatch.h>
 
 #define realUIIdiom UIDevice.currentDevice.userInterfaceIdiom
 extern NSNotificationName UIPresentationControllerPresentationTransitionWillBeginNotification;
@@ -19,8 +21,15 @@ extern NSNotificationName UIPresentationControllerPresentationTransitionWillBegi
 - (UIView *)buttonGlassView;
 @end
 
-// private functions
-extern BOOL _UISolariumEnabled(void) __attribute__((weak_import));
+// private functions - dynamically looked up via dlsym since removed from SDK
+static inline BOOL UISolariumEnabled(void) {
+    static BOOL (*func)(void) = NULL;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        func = dlsym(RTLD_DEFAULT, "_UISolariumEnabled");
+    });
+    return func ? func() : NO;
+}
 
 @interface UIBarButtonItem(private)
 - (UIView *)view;
