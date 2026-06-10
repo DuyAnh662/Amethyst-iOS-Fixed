@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <sys/utsname.h>
 #include <unistd.h>
+#include <mach/mach.h>
 
 #include "utils.h"
 
@@ -143,7 +144,7 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
         JIT26SendJITScript([NSString stringWithContentsOfFile:[NSBundle.mainBundle pathForResource:@"UniversalJIT26Extension" ofType:@"js"]]);
         JIT26SetDetachAfterFirstBr(!jit26AlwaysAttached);
         // make sure we don't get stuck in EXC_BAD_ACCESS
-        task_set_exception_ports(mach_task_self(), EXC_MASK_BAD_ACCESS, 0, EXCEPTION_DEFAULT, MACHINE_THREAD_STATE);
+        task_set_exception_ports(mach_task_self(), EXC_MASK_BAD_ACCESS, 0, EXCEPTION_DEFAULT, THREAD_STATE_NONE);
     }
     if (!requiresTXMWorkaround || jit26AlwaysAttached) {
         if (jit26AlwaysAttached) {
@@ -203,7 +204,7 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
         }
 
         // iPhone 8 Plus / A11 optimizations
-        NSString *deviceModel = [self deviceModelName];
+        NSString *deviceModel = deviceModelName();
         if ([deviceModel containsString:@"iPhone10"]) {
             NSLog(@"[JavaLauncher] iPhone 8/8 Plus/X detected (A11 Bionic), applying optimizations");
             // A11 GPU optimization: limit max thread count
