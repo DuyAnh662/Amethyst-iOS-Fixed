@@ -56,6 +56,10 @@ int pojavInitOpenGL() {
         renderer = @ RENDERER_NAME_GL4ES;
         setenv("POJAV_RENDERER", renderer.UTF8String, 1);
         set_gl_bridge_tbl();
+    } else if ([renderer isEqualToString:@ RENDERER_NAME_NG_GL4ES]) {
+        renderer = @ RENDERER_NAME_NG_GL4ES;
+        setenv("POJAV_RENDERER", renderer.UTF8String, 1);
+        set_gl_bridge_tbl();
     } else if ([renderer isEqualToString:@ RENDERER_NAME_MOBILEGLUES]) {
         renderer = @ RENDERER_NAME_MOBILEGLUES;
         setenv("POJAV_RENDERER", renderer.UTF8String, 1);
@@ -65,6 +69,11 @@ int pojavInitOpenGL() {
     } else if ([renderer hasPrefix:@"libOSMesa"]) {
         setenv("GALLIUM_DRIVER","zink",1);
         set_osm_bridge_tbl();
+    } else {
+        NSLog(@"[EGL Bridge] Unknown renderer '%@', falling back to %@", renderer, @ RENDERER_NAME_GL4ES);
+        renderer = @ RENDERER_NAME_GL4ES;
+        setenv("POJAV_RENDERER", renderer.UTF8String, 1);
+        set_gl_bridge_tbl();
     }
     JNI_LWJGL_changeRenderer(renderer.UTF8String);
     // Preload renderer library
@@ -102,20 +111,32 @@ void pojavMakeCurrent(basic_render_window_t* window) {
 }
 
 void* pojavCreateContext(basic_render_window_t* contextSrc) {
-    if (clientAPI == GLFW_NO_API) {
-        // Game has selected Vulkan API to render
-        NSLog(@"[EGL Bridge] Vulkan API selected, returning Metal layer for MoltenVK");
-        // Configure MoltenVK for A11 GPU (iPhone 8 Plus)
-        setenv("MVK_CONFIG_PREFILL_METAL_COMMAND_BUFFERS", "1", 1);
-        setenv("MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS", "0", 1);
-        setenv("MVK_CONFIG_USE_METAL_PRIVATE_CLASSES", "0", 1);
-        return (__bridge void *)SurfaceViewController.surface.layer;
-    }
-
+    // Always initialize OpenGL bridge first, even for Vulkan path,
+    // because some games/mods still call GL.createCapabilities()
     static BOOL inited = NO;
     if (!inited) {
         inited = YES;
         pojavInitOpenGL();
+    }
+
+    if (clientAPI == GLFW_NO_API) {
+        // Game has selected Vulkan API to render
+        NSLog(@"[EGL Bridge] Vulkan API selected, returning Metal layer for MoltenVK");
+        // Configure MoltenVK for A11 GPU (iPhone 8 Plus / iPhone X)
+        // A11 has a tri-core Apple GPU - optimize Metal command handling
+        setenv("MVK_CONFIG_PREFILL_METAL_COMMAND_BUFFERS", "1", 1);
+        setenv("MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS", "0", 1);
+        setenv("MVK_CONFIG_USE_METAL_PRIVATE_CLASSES", "0", 1);
+        setenv("MVK_CONFIG_USE_COMMAND_POOLING", "1", 1);
+        setenv("MVK_CONFIG_USE_MTLHEAP", "0", 1);
+        setenv("MVK_CONFIG_FAST_MATH_ENABLED", "1", 1);
+        setenv("MVK_CONFIG_SPECIALIZED_QUEUE_FAMILIES", "1", 1);
+        setenv("MVK_CONFIG_SWAPCHAIN_MAG_FILTER_USE_NEAREST", "1", 1);
+        // iOS 16.7.16 compatibility: disable Metal private classes for A11
+        // to prevent crashes on older iOS versions
+        setenv("MVK_CONFIG_LOG_LEVEL", "0", 1);
+        NSLog(@"[EGL Bridge] MoltenVK configured for A11 GPU + iOS 16.7.16");
+        return (__bridge void *)SurfaceViewController.surface.layer;
     }
 
     return br_init_context(contextSrc);

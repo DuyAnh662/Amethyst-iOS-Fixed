@@ -27,6 +27,7 @@ include_directories(
   "external/ballpa1n"
   "external/ballpa1n/wrapped"
   "external/mach"
+  "external/NG-GL4ES/include"
 )
 
 # For cacio support library
@@ -63,6 +64,8 @@ target_link_libraries(tinygl4angle
   "-framework libEGL"
   "-framework libGLESv2"
 )
+
+
 
 # AFNetworking
 add_library(AFNetworking SHARED
@@ -150,8 +153,9 @@ add_executable(AngelAuraAmethyst
   LauncherPreferences.m
   LauncherPreferencesViewController.m
   LauncherPrefContCfgViewController.m
-  MGSettingsViewController.m
-  LauncherPrefGameDirViewController.m
+   MGSettingsViewController.m
+   NGSettingsViewController.m
+   LauncherPrefGameDirViewController.m
   LauncherPrefManageJREViewController.m
   LauncherProfileEditorViewController.m
   LauncherProfilesViewController.m

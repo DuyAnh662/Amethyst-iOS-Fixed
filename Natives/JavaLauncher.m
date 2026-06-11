@@ -47,13 +47,6 @@ void init_loadDefaultEnv() {
     // Fix white color on banner and sheep, since GL4ES 1.1.5
     setenv("LIBGL_NORMALIZE", "1", 1);
 
-    // Override OpenGL version for Zink - use 4.1 for compatibility
-    setenv("MESA_GL_VERSION_OVERRIDE", "4.1", 1);
-    // Zink/Mesa optimization flags for A11 GPU
-    setenv("MESA_EXTENSION_MAX_YEAR", "2013", 1);
-    // Disable features not needed on A11 GPU for better performance
-    setenv("mesa_glthread", "true", 1);
-
     // Runs JVM in a separate thread
     setenv("HACK_IGNORE_START_ON_FIRST_THREAD", "1", 1);
 }
@@ -203,6 +196,35 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
             NSLog(@"[JavaLauncher] MobileGlues environment variables set from preferences");
         }
 
+        // Setup NG-GL4ES environment variables from preferences (configurable settings)
+        if ([renderer isEqualToString:@ RENDERER_NAME_NG_GL4ES]) {
+            // NG-GL4ES uses LIBGL_* environment variables (same as gl4es)
+            setenv("LIBGL_NOBANNER", getPrefBool(@"ng.nobanner") ? "1" : "0", 1);
+            setenv("LIBGL_NOERROR", getPrefBool(@"ng.noerror") ? "1" : "0", 1);
+            setenv("LIBGL_FPS", getPrefBool(@"ng.showfps") ? "1" : "0", 1);
+            setenv("LIBGL_VSYNC", getPrefBool(@"ng.vsync") ? "1" : "0", 1);
+            setenv("LIBGL_NORMALIZE", getPrefBool(@"ng.normalize") ? "1" : "0", 1);
+            setenv("LIBGL_BATCH", [@(getPrefInt(@"ng.batchMode")) stringValue].UTF8String, 1);
+            setenv("LIBGL_ES", [@(getPrefInt(@"ng.esVersion")) stringValue].UTF8String, 1);
+            setenv("LIBGL_GL", [@(getPrefInt(@"ng.glVersion")) stringValue].UTF8String, 1);
+            setenv("LIBGL_SHRINK", [@(getPrefInt(@"ng.texshrink")) stringValue].UTF8String, 1);
+            setenv("LIBGL_FB", [@(getPrefInt(@"ng.fboMode")) stringValue].UTF8String, 1);
+            setenv("LIBGL_STREAM", [@(getPrefInt(@"ng.streamMode")) stringValue].UTF8String, 1);
+            setenv("LIBGL_GAMMA", [@(getPrefFloat(@"ng.gamma")) stringValue].UTF8String, 1);
+            setenv("LIBGL_NOINTOVLHACK", getPrefBool(@"ng.nointovlhack") ? "1" : "0", 1);
+            NSLog(@"[JavaLauncher] NG-GL4ES environment variables set from preferences");
+        }
+
+        // Zink/Mesa renderer environment setup (all devices)
+        if ([renderer isEqualToString:@ RENDERER_NAME_VK_ZINK]) {
+            setenv("MESA_GL_VERSION_OVERRIDE", "3.3", 1);
+            setenv("MESA_EXTENSION_MAX_YEAR", "2013", 1);
+            setenv("mesa_glthread", "true", 1);
+            setenv("GALLIUM_DRIVER", "zink", 1);
+            setenv("MESA_GLSL_CACHE_MAX_SIZE", "64", 1);
+            NSLog(@"[JavaLauncher] Zink/Mesa renderer environment set");
+        }
+
         // iPhone 8 Plus / A11 optimizations
         NSString *deviceModel = deviceModelName();
         if ([deviceModel containsString:@"iPhone10"]) {
@@ -212,6 +234,25 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
             // Optimize for 3GB RAM
             if (getPrefBool(@"java.auto_ram")) {
                 setenv("MG_AUTO_RAM_DEVICE", "iphone8plus", 1);
+            }
+            // Zink/Vulkan A11 specific optimizations for iOS 16.7.16
+            if ([renderer isEqualToString:@ RENDERER_NAME_VK_ZINK]) {
+                // A11 GPU: Use proper MoltenVK settings for the tri-core Apple GPU
+                setenv("MVK_CONFIG_PREFILL_METAL_COMMAND_BUFFERS", "1", 1);
+                setenv("MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS", "0", 1);
+                setenv("MVK_CONFIG_USE_METAL_PRIVATE_CLASSES", "0", 1);
+                setenv("MESA_GLSL_CACHE_MAX_SIZE", "32", 1); // smaller cache for A11
+                NSLog(@"[JavaLauncher] Zink/Vulkan A11 optimizations applied");
+            }
+            // NG-GL4ES A11 specific optimizations
+            if ([renderer isEqualToString:@ RENDERER_NAME_NG_GL4ES]) {
+                // A11 GPU: 3-cluster Apple GPU, optimize texture handling
+                setenv("LIBGL_NPOT", "2", 1); // Enable NPOT but prefer POT
+                setenv("LIBGL_FBORECYCLE", "1", 1); // Recycle FBOs for better memory
+                setenv("LIBGL_AVOID16BITS", "1", 1); // Avoid 16-bit for better quality
+                setenv("LIBGL_TEXCOPY", "0", 1); // Disable texture copy for performance
+                setenv("LIBGL_DEFAULTWRAP", "0", 1); // Use proper wrap mode
+                NSLog(@"[JavaLauncher] NG-GL4ES A11 optimizations applied");
             }
         }
 

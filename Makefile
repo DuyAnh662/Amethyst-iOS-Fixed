@@ -261,7 +261,7 @@ check:
 		$(info $(shell printf "%-20s" "$(v)") = $(value $(v)))) \
 	)
 
-native: dep_mg
+native: dep_mg dep_ng_gl4es
 	echo '[Amethyst v$(VERSION)] native - start'
 	mkdir -p $(WORKINGDIR)
 	cd $(WORKINGDIR) && cmake \
@@ -340,6 +340,25 @@ dep_mg:
 		cp $(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/external/ios/libspirv-cross-c-shared.0.dylib $(WORKINGDIR)/libspirv-cross-c-shared.0.dylib; \
 	fi
 	echo '[Amethyst v$(VERSION)] dep_mg - end'
+
+dep_ng_gl4es:
+	echo '[Amethyst v$(VERSION)] dep_ng_gl4es - start'
+	mkdir -p $(WORKINGDIR)/ng_gl4es
+	cd $(WORKINGDIR)/ng_gl4es && cmake \
+		-DMACOS="1" \
+		-DNOX11=ON \
+		-DCMAKE_CROSSCOMPILING=true \
+		-DCMAKE_SYSTEM_NAME=Darwin \
+		-DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+		-DCMAKE_OSX_SYSROOT="$(SDKPATH)" \
+		-DCMAKE_OSX_ARCHITECTURES=arm64 \
+		-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
+		-DCMAKE_C_FLAGS="-arch arm64 -mcpu=apple-a11 -mtune=apple-a11" \
+		$(SOURCEDIR)/Natives/external/NG-GL4ES/
+
+	cmake --build $(WORKINGDIR)/ng_gl4es --config RelWithDebInfo -j$(JOBS) --target ng_gl4es
+	cp $(WORKINGDIR)/ng_gl4es/libng_gl4es.dylib $(WORKINGDIR)/libng_gl4es.dylib
+	echo '[Amethyst v$(VERSION)] dep_ng_gl4es - end'
 
 assets:
 	echo '[Amethyst v$(VERSION)] assets - start'

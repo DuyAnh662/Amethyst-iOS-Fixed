@@ -138,6 +138,7 @@ NSArray* getRendererKeys(BOOL containsDefault) {
     NSMutableArray *array = @[
         @"auto",
         @ RENDERER_NAME_GL4ES,
+        @ RENDERER_NAME_NG_GL4ES,
         @ RENDERER_NAME_MTL_ANGLE,
         @ RENDERER_NAME_MOBILEGLUES,
         @ RENDERER_NAME_VK_ZINK
@@ -156,6 +157,7 @@ NSArray* getRendererNames(BOOL containsDefault) {
     array = @[
         localize(@"preference.title.renderer.debug.auto", nil),
         localize(@"preference.title.renderer.debug.gl4es", nil),
+        localize(@"preference.title.renderer.debug.ng_gl4es", nil),
         localize(@"preference.title.renderer.debug.angle", nil),
         localize(@"preference.title.renderer.debug.mg", nil),
         localize(@"preference.title.renderer.debug.zink", nil)
@@ -176,12 +178,12 @@ NSString* getDefaultRendererForDevice() {
     
     // iPhone 8 Plus: iPhone10,2 or iPhone10,5
     if ([machine isEqualToString:@"iPhone10,2"] || [machine isEqualToString:@"iPhone10,5"]) {
-        // iPhone 8 Plus with A11 - MobileGlues is best for 1.17+
-        return @ RENDERER_NAME_MOBILEGLUES;
+        // iPhone 8 Plus with A11 - NG-GL4ES is optimized for A11
+        return @ RENDERER_NAME_NG_GL4ES;
     }
     // iPhone X: iPhone10,3 or iPhone10,6 (same A11)
     if ([machine isEqualToString:@"iPhone10,3"] || [machine isEqualToString:@"iPhone10,6"]) {
-        return @ RENDERER_NAME_MOBILEGLUES;
+        return @ RENDERER_NAME_NG_GL4ES;
     }
     return @"auto";
 }
@@ -194,7 +196,7 @@ NSInteger getDefaultRAMForDevice() {
     // iPhone 8 Plus has 3GB RAM
     if ([machine isEqualToString:@"iPhone10,2"] || [machine isEqualToString:@"iPhone10,5"] ||
         [machine isEqualToString:@"iPhone10,3"] || [machine isEqualToString:@"iPhone10,6"]) {
-        return 2048; // 2GB for Minecraft, leaving 1GB for system
+        return 2048; // 2GB for Minecraft, leaving 1GB for system - optimized for A11
     }
     return 1024;
 }

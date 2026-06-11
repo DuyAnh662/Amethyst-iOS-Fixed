@@ -9,6 +9,7 @@
 #import "LauncherPrefContCfgViewController.h"
 #import "LauncherPrefManageJREViewController.h"
 #import "MGSettingsViewController.h"
+#import "NGSettingsViewController.h"
 #import "UIKit+hook.h"
 
 #import "config.h"
@@ -172,6 +173,18 @@
               @"enableCondition": whenNotInGame,
               @"action": ^() {
                   MGSettingsViewController *vc = [[MGSettingsViewController alloc] init];
+                  UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
+                  nav.modalPresentationStyle = UIModalPresentationFormSheet;
+                  [UIApplication.sharedApplication.keyWindow.rootViewController presentViewController:nav animated:YES completion:nil];
+              }
+            },
+            @{@"key": @"ng_settings",
+              @"hasDetail": @YES,
+              @"icon": @"gearshape.2",
+              @"type": self.typeButton,
+              @"enableCondition": whenNotInGame,
+              @"action": ^() {
+                  NGSettingsViewController *vc = [[NGSettingsViewController alloc] init];
                   UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
                   nav.modalPresentationStyle = UIModalPresentationFormSheet;
                   [UIApplication.sharedApplication.keyWindow.rootViewController presentViewController:nav animated:YES completion:nil];
