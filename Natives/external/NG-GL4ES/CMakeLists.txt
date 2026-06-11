@@ -11,7 +11,11 @@ project(ng_gl4es)
 
     if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
         add_compile_options(-g0 -O3 -ffunction-sections -fdata-sections)
-        add_link_options(-Wl,--gc-sections)
+        if(APPLE)
+            add_link_options(-Wl,-dead_strip)
+        else()
+            add_link_options(-Wl,--gc-sections)
+        endif()
     elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
         add_compile_options(/O2 /GL)
     endif()
@@ -181,6 +185,8 @@ target_include_directories(ng_gl4es PUBLIC
     ${CMAKE_SOURCE_DIR}/include
 )
 
-set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES
-    LINK_FLAGS "-Wl,--strip-all"
-)
+if(NOT APPLE)
+    set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES
+        LINK_FLAGS "-Wl,--strip-all"
+    )
+endif()
