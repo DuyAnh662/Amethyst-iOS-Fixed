@@ -448,15 +448,10 @@
         return;
     }
     ControlButton *sourceButton = (ControlButton *)self.currentGesture.view;
-    NSString *copySuffix = localize(@"custom_controls.button_menu.copy_suffix", nil);
-    if (![copySuffix length]) copySuffix = @" (copy)";
-
     if ([sourceButton isKindOfClass:[ControlDrawer class]]) {
         ControlDrawer *drawer = (ControlDrawer *)sourceButton;
         NSMutableDictionary *newData = [NSKeyedUnarchiver unarchiveObjectWithData:
             [NSKeyedArchiver archivedDataWithRootObject:drawer.drawerData]];
-        newData[@"properties"][@"name"] = [NSString stringWithFormat:@"%@%@",
-            newData[@"properties"][@"name"], copySuffix];
         ControlDrawer *newDrawer = [ControlDrawer buttonWithData:newData];
         [self doAddButton:newDrawer atIndex:@([self.ctrlView.layoutDictionary[@"mDrawerDataList"] count])];
         [newDrawer snapAndAlignX:drawer.frame.origin.x + 10 Y:drawer.frame.origin.y + 10];
@@ -471,7 +466,6 @@
         ControlSubButton *sub = (ControlSubButton *)sourceButton;
         NSMutableDictionary *newProps = [NSKeyedUnarchiver unarchiveObjectWithData:
             [NSKeyedArchiver archivedDataWithRootObject:sub.properties]];
-        newProps[@"name"] = [NSString stringWithFormat:@"%@%@", newProps[@"name"], copySuffix];
         ControlSubButton *newSub = [ControlSubButton buttonWithProperties:newProps];
         newSub.parentDrawer = sub.parentDrawer;
         [self doAddButton:newSub atIndex:@(sub.parentDrawer.buttons.count)];
@@ -483,9 +477,6 @@
         ControlJoystick *joy = (ControlJoystick *)sourceButton;
         NSMutableDictionary *newProps = [NSKeyedUnarchiver unarchiveObjectWithData:
             [NSKeyedArchiver archivedDataWithRootObject:joy.properties]];
-        if (joy.properties[@"name"]) {
-            newProps[@"name"] = [NSString stringWithFormat:@"%@%@", joy.properties[@"name"], copySuffix];
-        }
         ControlJoystick *newJoy = [ControlJoystick buttonWithProperties:newProps];
         [self doAddButton:newJoy atIndex:@([self.ctrlView.layoutDictionary[@"mJoystickDataList"] count])];
         [newJoy snapAndAlignX:joy.frame.origin.x + 10 Y:joy.frame.origin.y + 10];
@@ -495,7 +486,6 @@
     } else {
         NSMutableDictionary *newProps = [NSKeyedUnarchiver unarchiveObjectWithData:
             [NSKeyedArchiver archivedDataWithRootObject:sourceButton.properties]];
-        newProps[@"name"] = [NSString stringWithFormat:@"%@%@", newProps[@"name"], copySuffix];
         ControlButton *newButton = [ControlButton buttonWithProperties:newProps];
         [self doAddButton:newButton atIndex:@([self.ctrlView.layoutDictionary[@"mControlDataList"] count])];
         [newButton snapAndAlignX:sourceButton.frame.origin.x + 10 Y:sourceButton.frame.origin.y + 10];
