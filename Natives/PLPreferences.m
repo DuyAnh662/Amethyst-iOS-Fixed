@@ -53,11 +53,14 @@
                 @"0": @{
                     @"1_16_5_older": @"8",
                     @"1_17_newer": @"17",
+                    @"1_21_newer": @"21",
+                    @"1_25_newer": @"25",
                     @"execute_jar": @"8"
                 }.mutableCopy,
                 @"8": @"internal",
                 @"17": @"internal",
-                @"21": @"internal"
+                @"21": @"internal",
+                @"25": @"internal"
             }.mutableCopy,
             @"java_args": @"",
             @"env_variables": @"",

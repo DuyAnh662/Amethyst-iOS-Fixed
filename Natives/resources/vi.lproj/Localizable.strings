@@ -179,7 +179,7 @@
 "preference.title.renderer.debug.angle" = "tinygl4angle (1.17+) - xuất ra OpenGL 3.2 (Core Profile, bị giới hạn)";
 "preference.title.renderer.debug.ng_gl4es" = "NG-GL4ES - xuất ra OpenGL 2.1, tối ưu cho A11";
 "preference.title.renderer.debug.mg" = "MobileGlues (1.17+) - xuất ra OpenGL 4.0, THỬ NGHIỆM";
-"preference.title.renderer.debug.zink" = "Zink (Mesa 21.0) - xuất ra OpenGL 4.1";
+"preference.title.renderer.debug.zink" = "Zink (Vulkan/MoltenVK) - xuất ra OpenGL 4.1";
 
 "preference.title.mg_settings" = "Cài đặt MobileGlues";
 "preference.title.ng_settings" = "Cài đặt NG-GL4ES";

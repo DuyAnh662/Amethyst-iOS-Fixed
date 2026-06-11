@@ -187,12 +187,12 @@
 "preference.title.renderer.debug.angle" = "ANGLE (1.17+) - exports OpenGL 3.2 (Core Profile, limited)";
 "preference.title.renderer.debug.mg" = "MobileGlues (1.17+) - exports OpenGL 4.0, EXPERIMENTAL";
 "preference.title.renderer.debug.ng_gl4es" = "NG-GL4ES - exports OpenGL 2.1, optimized for A11";
-"preference.title.renderer.debug.zink" = "Zink (Mesa 21.0) - exports OpenGL 4.1";
+"preference.title.renderer.debug.zink" = "Zink (Vulkan/MoltenVK) - exports OpenGL 4.1";
 
 "preference.title.mg_settings" = "MobileGlues settings";
 "preference.title.ng_settings" = "NG-GL4ES settings";
 
-"preference.detail.renderer" = "Change the OpenGL render engine to use. Zink is temporarily disabled on iOS 16 and later to diagnose issues.";
+"preference.detail.renderer" = "Change the OpenGL render engine to use. Zink (Vulkan/MoltenVK) is optimized for A11 devices on iOS 16.7.16.";
 
 "preference.title.resolution" = "Resolution (%)";
 "preference.detail.resolution" = "Allows you to decrease the game resolution.";
@@ -249,7 +249,12 @@
 "preference.manage_runtime.default.117" = "1.17 and newer";
 "preference.manage_runtime.footer.default" = "Minecraft 1.16.5 and older may run with a newer Java version, however compatibility with mods is not guaranteed. External runtimes can be placed in the “java_runtimes” folder. Changing Java version for “Execute .jar” only takes effect if the installer does not expect a newer Java version.";
 "preference.manage_runtime.footer.java8" = "This is the default version for Minecraft 1.16.5 and older.";
+"preference.manage_runtime.default.121" = "1.21 and newer";
+"preference.manage_runtime.default.125" = "1.25 and newer";
+
 "preference.manage_runtime.footer.java17" = "This is the default version for Minecraft 1.17 and newer.";
+"preference.manage_runtime.footer.java21" = "This is the default version for Minecraft 1.21 and newer.";
+"preference.manage_runtime.footer.java25" = "This is the default version for Minecraft 1.25 and newer (experimental).";
 "preference.manage_runtime.header.invalid" = "Invalid runtimes";
 
 "preference.title.java_args" = "JVM Launch arguments";
