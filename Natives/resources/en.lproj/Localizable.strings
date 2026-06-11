@@ -187,12 +187,13 @@
 "preference.title.renderer.debug.angle" = "ANGLE (1.17+) - exports OpenGL 3.2 (Core Profile, limited)";
 "preference.title.renderer.debug.mg" = "MobileGlues (1.17+) - exports OpenGL 4.0, EXPERIMENTAL";
 "preference.title.renderer.debug.ng_gl4es" = "NG-GL4ES - exports OpenGL 2.1, optimized for A11";
-"preference.title.renderer.debug.zink" = "Zink (Vulkan/MoltenVK) - exports OpenGL 4.1";
+"preference.title.renderer.debug.zink" = "Zink (Mesa/Vulkan/MoltenVK) - exports OpenGL 4.1/3.3";
+"preference.title.renderer.debug.vulkan" = "Vulkan (MoltenVK) - direct Vulkan API";
 
 "preference.title.mg_settings" = "MobileGlues settings";
 "preference.title.ng_settings" = "NG-GL4ES settings";
 
-"preference.detail.renderer" = "Change the OpenGL render engine to use. Zink (Vulkan/MoltenVK) is optimized for A11 devices on iOS 16.7.16.";
+"preference.detail.renderer" = "Change the OpenGL/Vulkan render engine to use. Zink uses Mesa to translate OpenGL to Vulkan via MoltenVK. Vulkan mode uses MoltenVK directly for apps that support the Vulkan API.";
 
 "preference.title.resolution" = "Resolution (%)";
 "preference.detail.resolution" = "Allows you to decrease the game resolution.";

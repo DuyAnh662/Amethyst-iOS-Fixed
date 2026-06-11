@@ -282,8 +282,16 @@ void initialize_gl4es() {
 #endif
     }
 
-#if !defined(__EMSCRIPTEN__) && !defined(__APPLE__)
+#if !defined(__EMSCRIPTEN__)
+#if defined(__APPLE__)
+    // On iOS, load EGL/GLES libraries (ANGLE was loaded globally by the bridge).
+    // macOS skips this since it has system OpenGL.
+    // load_libs() is a no-op under NO_LOADER; the actual EGL resolution happens
+    // via proc_address() -> dlsym(RTLD_DEFAULT, ...) which finds ANGLE symbols.
     load_libs();
+#else
+    load_libs();
+#endif
 #endif
 
 #if (defined(NOEGL) && !defined(ANDROID) && !defined(__APPLE__)) || defined(__EMSCRIPTEN__)

@@ -63,6 +63,10 @@ int pojavInitOpenGL() {
         // NG-GL4ES constructor calls glGetString(GL_EXTENSIONS) which needs a valid
         // current GL context. Initialize EGL first, then create a temp context
         // and make it current BEFORE dlopen to prevent SIGSEGV in GetHardwareExtensions.
+        // Also set LIBGL_EGL/LIBGL_GLES so NG-GL4ES can find our ANGLE implementation
+        // via dlsym(RTLD_DEFAULT, ...) instead of failing with RTLD_NEXT.
+        setenv("LIBGL_EGL", "@rpath/libtinygl4angle.dylib", 1);
+        setenv("LIBGL_GLES", "@rpath/libtinygl4angle.dylib", 1);
         BOOL ngInitOk = NO;
         if (!br_init()) {
             NSLog(@"[EGL Bridge] Failed to initialize EGL display for NG-GL4ES");
@@ -84,9 +88,18 @@ int pojavInitOpenGL() {
         set_gl_bridge_tbl();
     } else if ([renderer isEqualToString:@ RENDERER_NAME_MTL_ANGLE]) {
         set_gl_bridge_tbl();
-    } else if ([renderer hasPrefix:@"libOSMesa"]) {
+    } else if ([renderer isEqualToString:@ RENDERER_NAME_VK_ZINK]) {
         setenv("GALLIUM_DRIVER","zink",1);
         set_osm_bridge_tbl();
+    } else if ([renderer isEqualToString:@ RENDERER_NAME_VULKAN]) {
+        // Vulkan renderer: uses MoltenVK directly for games that support the Vulkan API.
+        // Set up MobileGlues as the OpenGL fallback in case the game also uses GL.
+        // When clientAPI == GLFW_NO_API, pojavCreateContext returns the Metal layer.
+        NSLog(@"[EGL Bridge] Vulkan renderer selected, using MoltenVK with MobileGlues GL fallback");
+        setenv("GALLIUM_DRIVER", "", 1);
+        renderer = @ RENDERER_NAME_MOBILEGLUES;
+        JNI_LWJGL_changeRenderer(renderer.UTF8String);
+        set_gl_bridge_tbl();
     } else {
         NSLog(@"[EGL Bridge] Unknown renderer '%@', falling back to %@", renderer, @ RENDERER_NAME_GL4ES);
         renderer = @ RENDERER_NAME_GL4ES;

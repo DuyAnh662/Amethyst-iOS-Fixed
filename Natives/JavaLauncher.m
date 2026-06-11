@@ -231,6 +231,18 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
             NSLog(@"[JavaLauncher] Zink/Mesa renderer environment set");
         }
 
+        // Vulkan renderer environment setup
+        if ([renderer isEqualToString:@ RENDERER_NAME_VULKAN]) {
+            setenv("GALLIUM_DRIVER", "", 1);
+            setenv("MVK_CONFIG_PREFILL_METAL_COMMAND_BUFFERS", "1", 1);
+            setenv("MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS", "0", 1);
+            setenv("MVK_CONFIG_USE_METAL_PRIVATE_CLASSES", "0", 1);
+            setenv("MVK_CONFIG_USE_COMMAND_POOLING", "1", 1);
+            setenv("MVK_CONFIG_FAST_MATH_ENABLED", "1", 1);
+            setenv("MVK_CONFIG_LOG_LEVEL", "0", 1);
+            NSLog(@"[JavaLauncher] Vulkan (MoltenVK) renderer environment set");
+        }
+
         // iPhone 8 Plus / A11 optimizations
         NSString *deviceModel = deviceModelName();
         if ([deviceModel containsString:@"iPhone10"]) {
@@ -241,7 +253,7 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
             if (getPrefBool(@"java.auto_ram")) {
                 setenv("MG_AUTO_RAM_DEVICE", "iphone8plus", 1);
             }
-            // Zink/Vulkan A11 specific optimizations for iOS 16.7.16
+            // Zink/Mesa A11 specific optimizations for iOS 16.7.16
             if ([renderer isEqualToString:@ RENDERER_NAME_VK_ZINK]) {
                 // A11 GPU: Use proper MoltenVK settings for the tri-core Apple GPU
                 setenv("MVK_CONFIG_PREFILL_METAL_COMMAND_BUFFERS", "1", 1);
@@ -255,7 +267,18 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
                 setenv("MESA_GL_VERSION_OVERRIDE", "3.3", 1);
                 setenv("MESA_GLSL_VERSION_OVERRIDE", "330", 1);
                 setenv("MESA_EXTENSION_MAX_YEAR", "2009", 1); // hide extensions from 2010+
-                NSLog(@"[JavaLauncher] Zink/Vulkan A11 optimizations applied (GL 3.3 fallback for TF issue)");
+                NSLog(@"[JavaLauncher] Zink A11 optimizations applied (GL 3.3 fallback for TF issue)");
+            }
+
+            // Vulkan A11 specific optimizations
+            if ([renderer isEqualToString:@ RENDERER_NAME_VULKAN]) {
+                setenv("MVK_CONFIG_PREFILL_METAL_COMMAND_BUFFERS", "1", 1);
+                setenv("MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS", "0", 1);
+                setenv("MVK_CONFIG_USE_METAL_PRIVATE_CLASSES", "0", 1);
+                setenv("MVK_CONFIG_USE_COMMAND_POOLING", "1", 1);
+                setenv("MVK_CONFIG_FAST_MATH_ENABLED", "1", 1);
+                setenv("MVK_CONFIG_LOG_LEVEL", "0", 1);
+                NSLog(@"[JavaLauncher] Vulkan A11 optimizations applied");
             }
             // NG-GL4ES A11 specific optimizations
             if ([renderer isEqualToString:@ RENDERER_NAME_NG_GL4ES]) {
