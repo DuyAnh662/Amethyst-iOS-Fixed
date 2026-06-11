@@ -159,8 +159,15 @@ target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
     spirv-cross-c
 )
 
-if(MACOS)
-    # iOS
+if(NOX11)
+    # iOS without X11 - EGL/GLESv2 loaded at runtime by loader.c via dlopen
+    target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC
+        "-framework Metal"
+        "-framework Foundation"
+        "-framework QuartzCore"
+    )
+elseif(MACOS)
+    # macOS desktop with X11
     target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC
         "-F${CMAKE_SOURCE_DIR}/external"
         "-framework libEGL"
