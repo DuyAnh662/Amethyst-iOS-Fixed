@@ -458,9 +458,9 @@
         newData[@"properties"][@"name"] = [NSString stringWithFormat:@"%@%@",
             newData[@"properties"][@"name"], copySuffix];
         ControlDrawer *newDrawer = [ControlDrawer buttonWithData:newData];
+        [self doAddButton:newDrawer atIndex:@([self.ctrlView.layoutDictionary[@"mDrawerDataList"] count])];
         [newDrawer snapAndAlignX:drawer.frame.origin.x + 10 Y:drawer.frame.origin.y + 10];
         [newDrawer update];
-        [self doAddButton:newDrawer atIndex:@([self.ctrlView.layoutDictionary[@"mDrawerDataList"] count])];
         for (ControlSubButton *sub in newDrawer.buttons) {
             [sub addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(showControlPopover:)]];
             [sub addGestureRecognizer:[[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(onTouch:)]];
@@ -474,9 +474,9 @@
         newProps[@"name"] = [NSString stringWithFormat:@"%@%@", newProps[@"name"], copySuffix];
         ControlSubButton *newSub = [ControlSubButton buttonWithProperties:newProps];
         newSub.parentDrawer = sub.parentDrawer;
+        [self doAddButton:newSub atIndex:@(sub.parentDrawer.buttons.count)];
         [newSub snapAndAlignX:sub.frame.origin.x + 10 Y:sub.frame.origin.y + 10];
         [newSub update];
-        [self doAddButton:newSub atIndex:@(sub.parentDrawer.buttons.count)];
         [newSub addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(showControlPopover:)]];
         [newSub addGestureRecognizer:[[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(onTouch:)]];
     } else if ([sourceButton isKindOfClass:[ControlJoystick class]]) {
@@ -487,9 +487,9 @@
             newProps[@"name"] = [NSString stringWithFormat:@"%@%@", joy.properties[@"name"], copySuffix];
         }
         ControlJoystick *newJoy = [ControlJoystick buttonWithProperties:newProps];
+        [self doAddButton:newJoy atIndex:@([self.ctrlView.layoutDictionary[@"mJoystickDataList"] count])];
         [newJoy snapAndAlignX:joy.frame.origin.x + 10 Y:joy.frame.origin.y + 10];
         [newJoy update];
-        [self doAddButton:newJoy atIndex:@([self.ctrlView.layoutDictionary[@"mJoystickDataList"] count])];
         [newJoy addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(showControlPopover:)]];
         [newJoy addGestureRecognizer:[[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(onTouch:)]];
     } else {
@@ -497,9 +497,9 @@
             [NSKeyedArchiver archivedDataWithRootObject:sourceButton.properties]];
         newProps[@"name"] = [NSString stringWithFormat:@"%@%@", newProps[@"name"], copySuffix];
         ControlButton *newButton = [ControlButton buttonWithProperties:newProps];
+        [self doAddButton:newButton atIndex:@([self.ctrlView.layoutDictionary[@"mControlDataList"] count])];
         [newButton snapAndAlignX:sourceButton.frame.origin.x + 10 Y:sourceButton.frame.origin.y + 10];
         [newButton update];
-        [self doAddButton:newButton atIndex:@([self.ctrlView.layoutDictionary[@"mControlDataList"] count])];
         [newButton addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(showControlPopover:)]];
         [newButton addGestureRecognizer:[[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(onTouch:)]];
     }

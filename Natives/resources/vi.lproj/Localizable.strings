@@ -181,6 +181,9 @@
 "preference.title.renderer.debug.mg" = "MobileGlues (1.17+) - xuất ra OpenGL 4.0, THỬ NGHIỆM";
 "preference.title.renderer.debug.zink" = "Zink (Mesa 21.0) - xuất ra OpenGL 4.1";
 
+"preference.title.mg_settings" = "Cài đặt MobileGlues";
+"preference.title.ng_settings" = "Cài đặt NG-GL4ES";
+
 "preference.detail.renderer" = "Thay đổi kết xuất OpenGL được sử dụng";
 
 "preference.title.resolution" = "Độ phân giải (%)";

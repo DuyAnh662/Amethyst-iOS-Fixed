@@ -64,6 +64,33 @@
             @"auto_ram": @(!getEntitlementValue(@"com.apple.private.memorystatus")),
             @"allocated_memory": [NSNumber numberWithFloat:roundf((NSProcessInfo.processInfo.physicalMemory / 1048576) * 0.25)]
         }.mutableCopy,
+        @"mg": @{
+            @"maxGlslCacheSize": @2,
+            @"enableAngle": @0,
+            @"ignoreError": @0,
+            @"multidrawMode": @0,
+            @"customGLVersion": @0,
+            @"angleDepthClearFix": @0,
+            @"extComputeShader": @NO,
+            @"extTimerQuery": @NO,
+            @"extDirectStateAccess": @YES,
+            @"fsr1Setting": @NO
+        }.mutableCopy,
+        @"ng": @{
+            @"nobanner": @NO,
+            @"noerror": @NO,
+            @"showfps": @NO,
+            @"vsync": @YES,
+            @"normalize": @YES,
+            @"batchMode": @(-1),
+            @"esVersion": @0,
+            @"glVersion": @0,
+            @"fboMode": @0,
+            @"streamMode": @(-1),
+            @"texshrink": @0,
+            @"gamma": @0,
+            @"nointovlhack": @YES
+        }.mutableCopy,
         @"internal": @{
             @"isolated": @NO,
             @"latest_version": [NSDictionary new]

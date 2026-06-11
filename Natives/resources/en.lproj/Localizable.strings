@@ -189,6 +189,9 @@
 "preference.title.renderer.debug.ng_gl4es" = "NG-GL4ES - exports OpenGL 2.1, optimized for A11";
 "preference.title.renderer.debug.zink" = "Zink (Mesa 21.0) - exports OpenGL 4.1";
 
+"preference.title.mg_settings" = "MobileGlues settings";
+"preference.title.ng_settings" = "NG-GL4ES settings";
+
 "preference.detail.renderer" = "Change the OpenGL render engine to use. Zink is temporarily disabled on iOS 16 and later to diagnose issues.";
 
 "preference.title.resolution" = "Resolution (%)";

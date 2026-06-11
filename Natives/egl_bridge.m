@@ -60,6 +60,24 @@ int pojavInitOpenGL() {
         renderer = @ RENDERER_NAME_NG_GL4ES;
         setenv("POJAV_RENDERER", renderer.UTF8String, 1);
         set_gl_bridge_tbl();
+        // NG-GL4ES constructor calls glGetString(GL_EXTENSIONS) which needs a valid
+        // current GL context. Initialize EGL first, then create a temp context
+        // and make it current BEFORE dlopen to prevent SIGSEGV in GetHardwareExtensions.
+        BOOL ngInitOk = NO;
+        if (!br_init()) {
+            NSLog(@"[EGL Bridge] Failed to initialize EGL display for NG-GL4ES");
+        } else {
+            basic_render_window_t *tmpCtx = br_init_context(NULL);
+            if (tmpCtx) {
+                br_make_current(tmpCtx);
+                ngInitOk = YES;
+            } else {
+                NSLog(@"[EGL Bridge] Warning: Could not create temp context for NG-GL4ES, extension query may fail");
+            }
+        }
+        JNI_LWJGL_changeRenderer(renderer.UTF8String);
+        dlopen([NSString stringWithFormat:@"@rpath/%@", renderer].UTF8String, RTLD_GLOBAL);
+        return ngInitOk ? 0 : 1;
     } else if ([renderer isEqualToString:@ RENDERER_NAME_MOBILEGLUES]) {
         renderer = @ RENDERER_NAME_MOBILEGLUES;
         setenv("POJAV_RENDERER", renderer.UTF8String, 1);
