@@ -201,8 +201,7 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
         // Setup NG-GL4ES environment variables from preferences (configurable settings)
         if ([renderer isEqualToString:@ RENDERER_NAME_NG_GL4ES]) {
             // NG-GL4ES uses LIBGL_* environment variables (same as gl4es)
-            // Force LIBGL_NOBANNER=1 to work around SIGSEGV in GetHardwareExtensions
-            // on devices where glGetString(GL_EXTENSIONS) returns null (iOS 16.7.16, A11/A12 GPUs)
+            // Suppress build info banner for cleaner logs
             setenv("LIBGL_NOBANNER", "1", 1);
             setenv("LIBGL_NOERROR", getPrefBool(@"ng.noerror") ? "1" : "0", 1);
             setenv("LIBGL_FPS", getPrefBool(@"ng.showfps") ? "1" : "0", 1);
@@ -260,14 +259,7 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
                 setenv("MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS", "0", 1);
                 setenv("MVK_CONFIG_USE_METAL_PRIVATE_CLASSES", "0", 1);
                 setenv("MESA_GLSL_CACHE_MAX_SIZE", "32", 1); // smaller cache for A11
-                // A11 GPU through MoltenVK doesn't support transform feedback properly.
-                // Lower GL version to avoid xfb_buffer shader compilation errors.
-                // This makes Minecraft fall back to the renderer that doesn't use
-                // GL_ARB_transform_feedback3 (xfb_buffer layout qualifier).
-                setenv("MESA_GL_VERSION_OVERRIDE", "3.3", 1);
-                setenv("MESA_GLSL_VERSION_OVERRIDE", "330", 1);
-                setenv("MESA_EXTENSION_MAX_YEAR", "2009", 1); // hide extensions from 2010+
-                NSLog(@"[JavaLauncher] Zink A11 optimizations applied (GL 3.3 fallback for TF issue)");
+                NSLog(@"[JavaLauncher] Zink A11 optimizations applied (MoltenVK config)");
             }
 
             // Vulkan A11 specific optimizations

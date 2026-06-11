@@ -290,6 +290,8 @@ void GetHardwareExtensions(int notest) {
 
     // Now get extensions
     const char* Exts = (const char*)gles_glGetString(GL_EXTENSIONS);
+    // Guard against NULL on A11/A12 GPUs (iOS 16.7.16+) where glGetString may return NULL
+    if (!Exts) Exts = "";
 // Parse them!
 #define S(A, B, C)                                                                                                     \
     if (strstr(Exts, A)) {                                                                                             \
@@ -461,6 +463,7 @@ void GetHardwareExtensions(int notest) {
     }
     // get GLES driver signatures...
     const char* vendor = (const char*)gles_glGetString(GL_VENDOR);
+    if (!vendor) vendor = "Unknown";
     SHUT_LOGD("Hardware vendor is %s", vendor);
     if (strstr(vendor, "ARM"))
         hardext.vendor = VEND_ARM;

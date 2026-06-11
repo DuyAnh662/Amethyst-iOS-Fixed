@@ -92,14 +92,13 @@ int pojavInitOpenGL() {
         setenv("GALLIUM_DRIVER","zink",1);
         set_osm_bridge_tbl();
     } else if ([renderer isEqualToString:@ RENDERER_NAME_VULKAN]) {
-        // Vulkan renderer: uses MoltenVK directly for games that support the Vulkan API.
-        // Set up MobileGlues as the OpenGL fallback in case the game also uses GL.
+        // Vulkan renderer: pure Vulkan path via MoltenVK.
+        // No GL bridge needed - game uses Vulkan API directly through MoltenVK.
         // When clientAPI == GLFW_NO_API, pojavCreateContext returns the Metal layer.
-        NSLog(@"[EGL Bridge] Vulkan renderer selected, using MoltenVK with MobileGlues GL fallback");
+        NSLog(@"[EGL Bridge] Vulkan renderer selected, pure MoltenVK path (no GL fallback)");
         setenv("GALLIUM_DRIVER", "", 1);
-        renderer = @ RENDERER_NAME_MOBILEGLUES;
-        JNI_LWJGL_changeRenderer(renderer.UTF8String);
-        set_gl_bridge_tbl();
+        // Skip all GL init: no bridge table, no dlopen, no br_init.
+        return 0;
     } else {
         NSLog(@"[EGL Bridge] Unknown renderer '%@', falling back to %@", renderer, @ RENDERER_NAME_GL4ES);
         renderer = @ RENDERER_NAME_GL4ES;
