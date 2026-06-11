@@ -36,6 +36,15 @@ jobs:
           echo "=== Verification ==="
           ls -d MobileGlues-cpp/3rdparty/*/ MobileGlues-cpp/include/FastSTL/
 
+      - name: Fetch NG-GL4ES nested deps (own git submodules)
+        run: |
+          cd Natives/external/NG-GL4ES
+          echo "=== Cloning NG-GL4ES 3rdparty dependencies ==="
+          git clone --depth=1 https://github.com/KhronosGroup/glslang.git 3rdparty/glslang
+          git clone --depth=1 https://github.com/KhronosGroup/SPIRV-Cross.git 3rdparty/SPIRV-Cross
+          echo "=== Verification ==="
+          ls -d 3rdparty/*/
+
       - name: Download UnzipKit framework & headers
         run: |
           # Download and extract framework binary
