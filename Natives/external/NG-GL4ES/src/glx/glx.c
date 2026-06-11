@@ -511,7 +511,9 @@ void pandora_set_gamma() {
 #endif
 
 static void signal_handler(int sig) {
+#ifndef NOX11
     if (globals4es.xrefresh) xrefresh();
+#endif
 #ifdef PANDORA
     pandora_reset_gamma();
 #endif
@@ -588,7 +590,11 @@ void glx_init() {
             signal(SIGQUIT, signal_handler);
             signal(SIGTERM, signal_handler);
         }
-        if (globals4es.xrefresh) atexit(xrefresh);
+        if (globals4es.xrefresh) {
+#ifndef NOX11
+            atexit(xrefresh);
+#endif
+        }
 #if !defined(ANDROID) && !defined(AMIGAOS4)
 #endif //! ANDROID && !AMIGAOS4
     }
