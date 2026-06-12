@@ -49,8 +49,26 @@ static bool gl_init() {
     return true;
 }
 
+static bool gl_ensure_display_initialized() {
+    EGLint major, minor;
+    if (handle.eglInitialize(g_EglDisplay, &major, &minor)) {
+        return true;
+    }
+    // Display was terminated (likely by NG-GL4ES constructor during dlopen).
+    // Re-establish EGL connection from scratch.
+    g_EglDisplay = handle.eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    if (g_EglDisplay == EGL_NO_DISPLAY) return false;
+    return handle.eglInitialize(g_EglDisplay, &major, &minor);
+}
+
 gl_render_window_t* gl_init_context(gl_render_window_t *share) {
     gl_render_window_t* bundle = calloc(1, sizeof(gl_render_window_t));
+
+    if (!gl_ensure_display_initialized()) {
+        NSLog(@"EGLBridge: Failed to (re)initialize EGL display");
+        free(bundle);
+        return NULL;
+    }
 
     NSString *renderer = NSProcessInfo.processInfo.environment[@"POJAV_RENDERER"];
     BOOL angleDesktopGL = [renderer isEqualToString:@ RENDERER_NAME_MTL_ANGLE];
@@ -139,6 +157,12 @@ void gl_swap_buffers() {
 
 gl_render_window_t* gl_init_pbuffer_context() {
     gl_render_window_t* bundle = calloc(1, sizeof(gl_render_window_t));
+
+    if (!gl_ensure_display_initialized()) {
+        NSLog(@"EGLBridge: Failed to (re)initialize EGL display for PBuffer");
+        free(bundle);
+        return NULL;
+    }
 
     const EGLint attribs[] = {
         EGL_RED_SIZE, 8,
