@@ -28,6 +28,7 @@ void dlsym_EGL() {
     handle.eglInitialize = dlsym(dl_handle, "eglInitialize");
     handle.eglMakeCurrent = dlsym(dl_handle, "eglMakeCurrent");
     handle.eglSwapBuffers = dlsym(dl_handle, "eglSwapBuffers");
+    handle.glGetErrorClear = dlsym(dl_handle, "glGetError");
     handle.eglReleaseThread = dlsym(dl_handle, "eglReleaseThread");
     handle.eglSwapInterval = dlsym(dl_handle, "eglSwapInterval");
     handle.eglTerminate = dlsym(dl_handle, "eglTerminate");
@@ -142,6 +143,11 @@ void gl_make_current(gl_render_window_t* bundle) {
 
     if(handle.eglMakeCurrent(g_EglDisplay, bundle->surface, bundle->surface, bundle->context)) {
         currentBundle = (basic_render_window_t *)bundle;
+        // Clear any stale GL errors left from NG-GL4ES init (GetHardwareExtensions)
+        // to prevent LWJGL's GL.createCapabilities() from rejecting the context.
+        if (handle.glGetErrorClear) {
+            while (handle.glGetErrorClear() != 0);
+        }
     } else {
         NSLog(@"EGLBridge: eglMakeCurrent returned with error: 0x%x", handle.eglGetError());
     }
