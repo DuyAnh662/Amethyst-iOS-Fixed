@@ -15,6 +15,7 @@ typedef basic_render_window_t* (*br_get_current_t)();
 
 bool (*br_init)();
 br_init_context_t br_init_context;
+gl_render_window_t* (*br_init_pbuffer_context)();
 br_make_current_t br_make_current;
 //br_get_current_t br_get_current = NULL;
 void (*br_swap_buffers)();

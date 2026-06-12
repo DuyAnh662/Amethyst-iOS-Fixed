@@ -98,6 +98,7 @@ void osm_terminate() {
 void set_osm_bridge_tbl() {
     br_init = osm_init;
     br_init_context = (br_init_context_t) osm_init_context;
+    br_init_pbuffer_context = NULL;
     br_make_current = (br_make_current_t) osm_make_current;
     br_swap_buffers = osm_swap_buffers;
     br_swap_interval = osm_swap_interval;

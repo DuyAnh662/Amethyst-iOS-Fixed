@@ -17,6 +17,7 @@ void dlsym_EGL() {
     handle.eglChooseConfig = dlsym(dl_handle, "eglChooseConfig");
     handle.eglCreateContext = dlsym(dl_handle, "eglCreateContext");
     handle.eglCreateWindowSurface = dlsym(dl_handle, "eglCreateWindowSurface");
+    handle.eglCreatePbufferSurface = dlsym(dl_handle, "eglCreatePbufferSurface");
     handle.eglDestroyContext = dlsym(dl_handle, "eglDestroyContext");
     handle.eglDestroySurface = dlsym(dl_handle, "eglDestroySurface");
     handle.eglGetConfigAttrib = dlsym(dl_handle, "eglGetConfigAttrib");
@@ -136,6 +137,60 @@ void gl_swap_buffers() {
     }
 }
 
+gl_render_window_t* gl_init_pbuffer_context() {
+    gl_render_window_t* bundle = calloc(1, sizeof(gl_render_window_t));
+
+    const EGLint attribs[] = {
+        EGL_RED_SIZE, 8,
+        EGL_GREEN_SIZE, 8,
+        EGL_BLUE_SIZE, 8,
+        EGL_ALPHA_SIZE, 8,
+        EGL_DEPTH_SIZE, 24,
+        EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,
+        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT,
+        EGL_NONE
+    };
+
+    EGLint num_configs;
+    if (!handle.eglChooseConfig(g_EglDisplay, attribs, &bundle->config, 1, &num_configs)) {
+        NSDebugLog(@"EGLBridge: Error couldn't get PBuffer config: 0x%x", handle.eglGetError());
+        free(bundle);
+        return NULL;
+    }
+    assert(bundle->config);
+    assert(num_configs > 0);
+
+    if (!handle.eglBindAPI(EGL_OPENGL_ES_API)) {
+        NSDebugLog(@"EGLBridge: eglBindAPI failed for PBuffer: 0x%x", handle.eglGetError());
+    }
+
+    const EGLint pbAttribs[] = {
+        EGL_WIDTH, 16,
+        EGL_HEIGHT, 16,
+        EGL_NONE
+    };
+    bundle->surface = handle.eglCreatePbufferSurface(g_EglDisplay, bundle->config, pbAttribs);
+    if (!bundle->surface) {
+        NSDebugLog(@"EGLBridge: Error creating PBuffer surface: 0x%x", handle.eglGetError());
+        free(bundle);
+        return NULL;
+    }
+
+    const EGLint ctx_attribs[] = {
+        EGL_CONTEXT_CLIENT_VERSION, 3,
+        EGL_NONE
+    };
+    bundle->context = handle.eglCreateContext(g_EglDisplay, bundle->config, EGL_NO_CONTEXT, ctx_attribs);
+    if (!bundle->context) {
+        NSDebugLog(@"EGLBridge: Error creating PBuffer context: 0x%x", handle.eglGetError());
+        handle.eglDestroySurface(g_EglDisplay, bundle->surface);
+        free(bundle);
+        return NULL;
+    }
+
+    return bundle;
+}
+
 void gl_destroy_context_only(gl_render_window_t* bundle) {
     if (!bundle) return;
     handle.eglMakeCurrent(g_EglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
@@ -165,6 +220,7 @@ void gl_terminate() {
 void set_gl_bridge_tbl() {
     br_init = gl_init;
     br_init_context = (br_init_context_t) gl_init_context;
+    br_init_pbuffer_context = gl_init_pbuffer_context;
     br_make_current = (br_make_current_t) gl_make_current;
     br_swap_buffers = gl_swap_buffers;
     br_swap_interval = gl_swap_interval;

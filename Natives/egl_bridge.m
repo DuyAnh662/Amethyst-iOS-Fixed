@@ -61,32 +61,39 @@ int pojavInitOpenGL() {
         setenv("POJAV_RENDERER", renderer.UTF8String, 1);
         set_gl_bridge_tbl();
         // NG-GL4ES constructor calls glGetString(GL_EXTENSIONS) which needs a valid
-        // current GL context. Initialize EGL first, then create a temp context
-        // and make it current BEFORE dlopen to prevent SIGSEGV in GetHardwareExtensions.
+        // current GL context. Initialize EGL first, then create a temp PBuffer context
+        // (off-screen, not tied to CAMetalLayer) and make it current BEFORE dlopen
+        // to prevent SIGSEGV in GetHardwareExtensions.
         // Also set LIBGL_EGL/LIBGL_GLES so NG-GL4ES can find our ANGLE implementation
         // via dlsym(RTLD_DEFAULT, ...) instead of failing with RTLD_NEXT.
         setenv("LIBGL_EGL", "@rpath/libtinygl4angle.dylib", 1);
         setenv("LIBGL_GLES", "@rpath/libtinygl4angle.dylib", 1);
         BOOL ngInitOk = NO;
-        basic_render_window_t *tmpCtx = NULL;
+        gl_render_window_t *tmpPbufCtx = NULL;
         if (!br_init()) {
             NSLog(@"[EGL Bridge] Failed to initialize EGL display for NG-GL4ES");
         } else {
-            tmpCtx = br_init_context(NULL);
-            if (tmpCtx) {
-                br_make_current(tmpCtx);
+            // Use PBuffer surface for temp context to avoid creating and destroying
+            // a window surface on the CAMetalLayer. ANGLE/MetalANGLE may not handle
+            // creating a second window surface on the same layer after the first
+            // is destroyed, which would cause eglCreateWindowSurface or eglMakeCurrent
+            // to fail silently for the real game context.
+            tmpPbufCtx = br_init_pbuffer_context();
+            if (tmpPbufCtx) {
+                br_make_current((basic_render_window_t *)tmpPbufCtx);
                 ngInitOk = YES;
             } else {
-                NSLog(@"[EGL Bridge] Warning: Could not create temp context for NG-GL4ES, extension query may fail");
+                NSLog(@"[EGL Bridge] Warning: Could not create PBuffer temp context for NG-GL4ES, extension query may fail");
             }
         }
         JNI_LWJGL_changeRenderer(renderer.UTF8String);
         dlopen([NSString stringWithFormat:@"@rpath/%@", renderer].UTF8String, RTLD_GLOBAL);
-        // Destroy temp context/surface so the real context creation in
-        // pojavCreateContext doesn't conflict on the same native window layer.
-        if (tmpCtx) {
+        // Destroy temp PBuffer context/surface. Since it uses a PBuffer surface
+        // (not the CAMetalLayer), the real window surface creation in
+        // pojavCreateContext will work cleanly.
+        if (tmpPbufCtx) {
             br_make_current(NULL);
-            gl_destroy_context_only(&tmpCtx->gl);
+            gl_destroy_context_only(tmpPbufCtx);
         }
         return ngInitOk ? 0 : 1;
     } else if ([renderer isEqualToString:@ RENDERER_NAME_MOBILEGLUES]) {
