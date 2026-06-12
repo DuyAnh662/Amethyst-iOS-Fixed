@@ -7,6 +7,7 @@
 #include "environ.h"
 #include "gl_bridge.h"
 #include "utils.h"
+#include "fishhook.h"
 
 static EGLDisplay g_EglDisplay;
 static egl_library handle;
@@ -42,6 +43,18 @@ void dlsym_EGL() {
 
     // Store real ANGLE eglGetCurrentContext for our interposing wrapper
     real_eglGetCurrentContext = handle.eglGetCurrentContext;
+
+    // Use fishhook to rebind eglGetCurrentContext in all loaded and future
+    // images. This ensures that LWJGL's native library (liblwjgl_opengl.dylib),
+    // loaded later by Java via System.loadLibrary(), resolves eglGetCurrentContext
+    // to our interposing function instead of calling ANGLE directly.
+    // Without this, LWJGL's GL.createCapabilities() on the render thread would
+    // call ANGLE's eglGetCurrentContext directly and get EGL_NO_CONTEXT because
+    // the context was bound on the launcher thread, causing a crash.
+    struct rebinding eglRebind[] = {
+        {"eglGetCurrentContext", (void *)eglGetCurrentContext, NULL}
+    };
+    rebind_symbols(eglRebind, 1);
 }
 
 // Forward declarations
