@@ -11,30 +11,31 @@
 static EGLDisplay g_EglDisplay;
 static egl_library handle;
 static gl_render_window_t* lastCreatedContext;
+static void* g_angleHandle;
 
 void dlsym_EGL() {
-    void* dl_handle = dlopen("@rpath/libtinygl4angle.dylib", RTLD_GLOBAL);
-    assert(dl_handle);
-    handle.eglBindAPI = dlsym(dl_handle, "eglBindAPI");
-    handle.eglChooseConfig = dlsym(dl_handle, "eglChooseConfig");
-    handle.eglCreateContext = dlsym(dl_handle, "eglCreateContext");
-    handle.eglCreateWindowSurface = dlsym(dl_handle, "eglCreateWindowSurface");
-    handle.eglCreatePbufferSurface = dlsym(dl_handle, "eglCreatePbufferSurface");
-    handle.eglDestroyContext = dlsym(dl_handle, "eglDestroyContext");
-    handle.eglDestroySurface = dlsym(dl_handle, "eglDestroySurface");
-    handle.eglGetConfigAttrib = dlsym(dl_handle, "eglGetConfigAttrib");
-    handle.eglGetCurrentContext = dlsym(dl_handle, "eglGetCurrentContext");
-    handle.eglGetDisplay = dlsym(dl_handle, "eglGetDisplay");
-    handle.eglGetError = dlsym(dl_handle, "eglGetError");
-    handle.eglGetPlatformDisplay = dlsym(dl_handle, "eglGetPlatformDisplay");
-    handle.eglInitialize = dlsym(dl_handle, "eglInitialize");
-    handle.eglMakeCurrent = dlsym(dl_handle, "eglMakeCurrent");
-    handle.eglSwapBuffers = dlsym(dl_handle, "eglSwapBuffers");
-    handle.glGetErrorClear = dlsym(dl_handle, "glGetError");
-    handle.eglReleaseThread = dlsym(dl_handle, "eglReleaseThread");
-    handle.eglSwapInterval = dlsym(dl_handle, "eglSwapInterval");
-    handle.eglTerminate = dlsym(dl_handle, "eglTerminate");
-    handle.eglGetCurrentSurface = dlsym(dl_handle, "eglGetCurrentSurface");
+    g_angleHandle = dlopen("@rpath/libtinygl4angle.dylib", RTLD_GLOBAL);
+    assert(g_angleHandle);
+    handle.eglBindAPI = dlsym(g_angleHandle, "eglBindAPI");
+    handle.eglChooseConfig = dlsym(g_angleHandle, "eglChooseConfig");
+    handle.eglCreateContext = dlsym(g_angleHandle, "eglCreateContext");
+    handle.eglCreateWindowSurface = dlsym(g_angleHandle, "eglCreateWindowSurface");
+    handle.eglCreatePbufferSurface = dlsym(g_angleHandle, "eglCreatePbufferSurface");
+    handle.eglDestroyContext = dlsym(g_angleHandle, "eglDestroyContext");
+    handle.eglDestroySurface = dlsym(g_angleHandle, "eglDestroySurface");
+    handle.eglGetConfigAttrib = dlsym(g_angleHandle, "eglGetConfigAttrib");
+    handle.eglGetCurrentContext = dlsym(g_angleHandle, "eglGetCurrentContext");
+    handle.eglGetDisplay = dlsym(g_angleHandle, "eglGetDisplay");
+    handle.eglGetError = dlsym(g_angleHandle, "eglGetError");
+    handle.eglGetPlatformDisplay = dlsym(g_angleHandle, "eglGetPlatformDisplay");
+    handle.eglInitialize = dlsym(g_angleHandle, "eglInitialize");
+    handle.eglMakeCurrent = dlsym(g_angleHandle, "eglMakeCurrent");
+    handle.eglSwapBuffers = dlsym(g_angleHandle, "eglSwapBuffers");
+    handle.glGetErrorClear = dlsym(g_angleHandle, "glGetError");
+    handle.eglReleaseThread = dlsym(g_angleHandle, "eglReleaseThread");
+    handle.eglSwapInterval = dlsym(g_angleHandle, "eglSwapInterval");
+    handle.eglTerminate = dlsym(g_angleHandle, "eglTerminate");
+    handle.eglGetCurrentSurface = dlsym(g_angleHandle, "eglGetCurrentSurface");
 }
 
 static void* dlsym_or_skip(void* lib, const char* name, void* fallback) {
@@ -204,12 +205,35 @@ void gl_make_current(gl_render_window_t* bundle) {
         if (handle.glGetErrorClear) {
             while (handle.glGetErrorClear() != 0);
         }
-        // Debug: test glGetString directly to see if NG-GL4ES sees the context
+        // Debug: compare glGetString from different sources
         typedef const unsigned char* (*glGetString_t)(unsigned int);
         glGetString_t glGetStringD = dlsym(RTLD_DEFAULT, "glGetString");
         if (glGetStringD) {
             const unsigned char* ver = glGetStringD(0x1F02);
             NSLog(@"EGLBridge: glGetString(GL_VERSION) via RTLD_DEFAULT = %s", ver ? ver : "NULL");
+        }
+        if (g_angleHandle) {
+            glGetString_t glGetStringA = dlsym(g_angleHandle, "glGetString");
+            if (glGetStringA) {
+                const unsigned char* ver = glGetStringA(0x1F02);
+                NSLog(@"EGLBridge: glGetString(GL_VERSION) via dlsym(ANGLE) = %s", ver ? ver : "NULL");
+            } else {
+                NSLog(@"EGLBridge: dlsym(ANGLE, glGetString) = NULL");
+            }
+            // Also test eglGetProcAddress
+            typedef void* (*eglGetProcAddr_t)(const char*);
+            eglGetProcAddr_t eglGetProcAddr = dlsym(g_angleHandle, "eglGetProcAddress");
+            if (eglGetProcAddr) {
+                glGetString_t glGetStringE = eglGetProcAddr("glGetString");
+                if (glGetStringE) {
+                    const unsigned char* ver = glGetStringE(0x1F02);
+                    NSLog(@"EGLBridge: glGetString(GL_VERSION) via eglGetProcAddress = %s", ver ? ver : "NULL");
+                } else {
+                    NSLog(@"EGLBridge: eglGetProcAddress(glGetString) = NULL");
+                }
+            } else {
+                NSLog(@"EGLBridge: dlsym(ANGLE, eglGetProcAddress) = NULL");
+            }
         }
         // Also test eglGetCurrentContext from the renderer
         void* eglCtx = dlsym(RTLD_DEFAULT, "eglGetCurrentContext");
