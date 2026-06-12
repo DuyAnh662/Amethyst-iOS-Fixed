@@ -173,7 +173,7 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
         } else if (minVersion <= 21) {
             defaultJRETag = @"1_21_newer";
         } else {
-            defaultJRETag = @"26_newer";
+            defaultJRETag = @"1_25_newer";
         }
 
         // Setup POJAV_RENDERER

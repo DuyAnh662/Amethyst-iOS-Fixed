@@ -54,7 +54,7 @@
                     @"1_16_5_older": @"8",
                     @"1_17_newer": @"17",
                     @"1_21_newer": @"21",
-                    @"26_newer": @"25",
+                    @"1_25_newer": @"25",
                     @"execute_jar": @"8"
                 }.mutableCopy,
                 @"8": @"internal",

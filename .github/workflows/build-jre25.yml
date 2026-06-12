@@ -1,0 +1,109 @@
+name: Build JRE 25 for iOS
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'jre25'
+
+jobs:
+  build-jre25-ios:
+    name: Build JRE 25 for iOS aarch64
+    runs-on: macos-14
+    steps:
+      - name: Checkout Amethyst-iOS
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          export HOMEBREW_NO_ENV_HINTS=1
+          brew install autoconf wget xz cmake fontconfig ldid
+
+      - name: Install boot JDK 25
+        run: |
+          JDK25_URL="https://download.java.net/java/GA/jdk25/bd75d5f9689641da8e1daabeccb5528b/36/GPL/openjdk-25_macos-aarch64_bin.tar.gz"
+          echo "Downloading JDK 25 GA..."
+          curl -sL "$JDK25_URL" -o /tmp/jdk25.tar.gz
+          sudo mkdir -p /Library/Java/JavaVirtualMachines/jdk25.jdk
+          sudo tar xzf /tmp/jdk25.tar.gz -C /Library/Java/JavaVirtualMachines/jdk25.jdk --strip-components=1
+          export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk25.jdk/Contents/Home
+          export PATH=$JAVA_HOME/bin:$PATH
+          java -version
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcrun --sdk iphoneos --show-sdk-path
+
+      - name: Clone upstream build scripts
+        run: |
+          git clone --branch buildjre17-21 --depth 1 \
+            https://github.com/PojavLauncherTeam/android-openjdk-build-multiarch.git \
+            jre-build
+
+      - name: Adapt build scripts for JDK 25
+        run: |
+          cd jre-build
+
+          # Override clone script for JDK 25
+          cat > 5_clonejdk.sh << 'CLONE_EOF'
+#!/bin/bash
+set -e
+git clone --branch jdk-25-ga --depth 1 https://github.com/openjdk/jdk25u openjdk-25
+CLONE_EOF
+
+          # Create patches dir for JDK 25, copy JDK 21 iOS patches as base
+          mkdir -p patches/jre_25/ios
+          cp patches/jre_21/ios/jdk21u_ios.diff patches/jre_25/ios/jdk25u_ios.diff
+
+          # Allow TARGET_VERSION=25 in scripts
+          sed -i '' 's/if \[\[ \$TARGET_VERSION -eq 21 \]\].*/if [[ $TARGET_VERSION -eq 25 ]] || [[ $TARGET_VERSION -eq 21 ]]; then\n    true/' 2_ci_build_global.sh
+
+          echo "=== 5_clonejdk.sh ==="
+          cat 5_clonejdk.sh
+
+      - name: Build JRE 25 for iOS
+        run: |
+          cd jre-build
+          export BUILD_IOS=1
+          export TARGET_VERSION=25
+          export JDK_DEBUG_LEVEL=release
+          export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk25.jdk/Contents/Home
+          export PATH=$JAVA_HOME/bin:$PATH
+
+          echo "=== Boot JDK ==="
+          java -version
+          echo "JAVA_HOME=$JAVA_HOME"
+
+          echo "=== Starting JRE 25 build for iOS ==="
+          bash 1_ci_build_arch_aarch64.sh 2>&1
+
+      - name: Upload JRE 25 artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jre25-ios-aarch64
+          path: jre-build/jre25*.tar.xz
+
+      - name: Upload JDK 25 artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jdk25-ios-aarch64
+          path: jre-build/jdk25*.tar.xz
+
+      - name: Upload debug info
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jre25-ios-debuginfo-aarch64
+          path: jre-build/dizout
+
+      - name: Upload config.log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jre25-build-logs
+          path: |
+            jre-build/openjdk-25/build/**/config.log
+            jre-build/openjdk-25/build/**/make.log
