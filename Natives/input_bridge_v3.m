@@ -279,10 +279,17 @@ void pojavPumpEvents(void* window) {
         GLFWInputEvent event = events[i];
         switch(event.type) {
             case EVENT_TYPE_CHAR:
+                // NSLog(@"[KeyboardDebug] Queue: Processing EVENT_TYPE_CHAR for character %d", event.i1);
                 if(GLFW_invoke_Char) GLFW_invoke_Char(window, event.i1);
                 break;
             case EVENT_TYPE_CHAR_MODS:
-                if(GLFW_invoke_CharMods) GLFW_invoke_CharMods(window, event.i1, event.i2);
+                // NSLog(@"[KeyboardDebug] Queue: Processing EVENT_TYPE_CHAR_MODS for character %d", event.i1);
+                if(GLFW_invoke_CharMods) {
+                    GLFW_invoke_CharMods(window, event.i1, event.i2);
+                } else if (GLFW_invoke_Char) {
+                    //NSLog(@"[KeyboardDebug] Queue: Fallback to GLFW_invoke_Char for character %d", event.i1);
+                    GLFW_invoke_Char(window, event.i1);
+                }
                 break;
             case EVENT_TYPE_KEY:
                 if(GLFW_invoke_Key) GLFW_invoke_Key(window, event.i1, event.i2, event.i3, event.i4);
@@ -448,14 +455,27 @@ BOOL CallbackBridge_nativeSendChar(jchar codepoint /* jint codepoint */) {
 }
 
 BOOL CallbackBridge_nativeSendCharMods(jchar codepoint, int mods) {
-    if (GLFW_invoke_CharMods && isInputReady) {
+    // NSLog(@"[KeyboardDebug] Bridge: Got character code=%d, modifiers=%d", codepoint, mods);
+    // NSLog(@"[KeyboardDebug] Bridge: Game status: GLFW_invoke_CharMods=%p, GLFW_invoke_Char=%p, isInputReady=%d", 
+          GLFW_invoke_CharMods, GLFW_invoke_Char, isInputReady);
+
+    if ((GLFW_invoke_CharMods || GLFW_invoke_Char) && isInputReady) {
         if (isUseStackQueueCall) {
+            // NSLog(@"[KeyboardDebug] Bridge: Sending character %d to stack-queue (isUseStackQueueCall)", codepoint);
             sendData(EVENT_TYPE_CHAR_MODS, (unsigned int) codepoint, mods, 0, 0);
         } else {
-            GLFW_invoke_CharMods((void*) showingWindow, codepoint, mods);
+            if (GLFW_invoke_CharMods) {
+                // NSLog(@"[KeyboardDebug] Bridge: Direct call to GLFW_invoke_CharMods for character %d", codepoint);
+                GLFW_invoke_CharMods((void*) showingWindow, codepoint, mods);
+            } else {
+                // NSLog(@"[KeyboardDebug] Bridge: Fallback! Direct call to GLFW_invoke_Char for character %d", codepoint);
+                GLFW_invoke_Char((void*) showingWindow, (unsigned int) codepoint);
+            }
         }
         return YES;
     }
+    
+    // NSLog(@"[KeyboardDebug] Bridge CRITICAL ERROR: Character %d DISCARDED! Reason: No handlers or game not ready.", codepoint);
     return NO;
 }
 /*
