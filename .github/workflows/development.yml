@@ -32,7 +32,7 @@ jobs:
 
       - name: Install JDK 8
         run: |
-          brew install --cask temurin8
+          brew install --cask temurin@8
 
       - name: Set Java 8 environment
         run: |
