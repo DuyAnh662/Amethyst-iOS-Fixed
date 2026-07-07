@@ -457,7 +457,7 @@ BOOL CallbackBridge_nativeSendChar(jchar codepoint /* jint codepoint */) {
 BOOL CallbackBridge_nativeSendCharMods(jchar codepoint, int mods) {
     // NSLog(@"[KeyboardDebug] Bridge: Got character code=%d, modifiers=%d", codepoint, mods);
     // NSLog(@"[KeyboardDebug] Bridge: Game status: GLFW_invoke_CharMods=%p, GLFW_invoke_Char=%p, isInputReady=%d", 
-          GLFW_invoke_CharMods, GLFW_invoke_Char, isInputReady);
+          GLFW_invoke_CharMods, GLFW_invoke_Char, isInputReady;
 
     if ((GLFW_invoke_CharMods || GLFW_invoke_Char) && isInputReady) {
         if (isUseStackQueueCall) {
