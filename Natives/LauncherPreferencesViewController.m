@@ -13,6 +13,7 @@
 #import "config.h"
 #import "ios_uikit_bridge.h"
 #import "utils.h"
+#import "debug/DebugServer.h"
 
 @interface LauncherPreferencesViewController()
 @property(nonatomic) NSArray<NSString*> *rendererKeys, *rendererList;
@@ -399,6 +400,37 @@
             @{@"key": @"debug_auto_correction",
                 @"hasDetail": @YES,
                 @"icon": @"textformat.abc.dottedunderline",
+                @"type": self.typeSwitch
+            },
+            @{@"key": @"debug_server_enabled",
+                @"hasDetail": @YES,
+                @"icon": @"network",
+                @"type": self.typeSwitch,
+                @"action": ^(BOOL enabled) {
+                    if (enabled) {
+                        NSString *token = getPrefObject(@"debug.debug_server_token");
+                        if (token.length < 8) {
+                            token = [DebugServer generateToken];
+                            setPrefObject(@"debug.debug_server_token", token);
+                        }
+                        uint16_t port = (uint16_t)getPrefInt(@"debug.debug_server_port") ?: 9090;
+                        BOOL localhost = getPrefBool(@"debug.debug_server_localhost_only");
+                        if ([DebugServer.shared startWithPort:port localhostOnly:localhost token:token]) {
+                            showDialog(localize(@"preference.title.debug_server_enabled", nil),
+                                [NSString stringWithFormat:@"URL: %@\n\nToken:\n%@",
+                                    [DebugServer.shared displayURL], token]);
+                        } else {
+                            showDialog(@"Debug server failed",
+                                [NSString stringWithFormat:@"Could not bind to port %u. Try a different port via prefs or kill whatever is using it.", port]);
+                        }
+                    } else {
+                        [DebugServer.shared stop];
+                    }
+                }
+            },
+            @{@"key": @"debug_server_localhost_only",
+                @"hasDetail": @YES,
+                @"icon": @"lock.shield",
                 @"type": self.typeSwitch
             }
         ]

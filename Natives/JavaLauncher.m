@@ -4,6 +4,7 @@
 #include <dlfcn.h>
 #include <errno.h>
 #include <libgen.h>
+#include <mach/mach.h>
 #include <spawn.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -251,8 +252,44 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
             // workaround only applies to 1.20.2+
             glLibName = RENDERER_NAME_MTL_ANGLE;
         }
-        margv[++margc] = [NSString stringWithFormat:@"-Dorg.lwjgl.opengl.libname=%s", glLibName].UTF8String;
+        // libMoltenVK is a Vulkan loader, not a GL implementation; binding it as
+        // opengl.libname makes LWJGL fail looking up GL symbols. The Vulkan
+        // libname is set in PojavLauncher.java instead.
+        //
+        // BUT: Minecraft 26.2's NativeLibrariesBootstrap.loadOpenGL() initializes
+        // org.lwjgl.opengl.GL during startup REGARDLESS of which renderer the
+        // game ultimately uses. With opengl.libname unset, LWJGL falls back to
+        // MacOSXLibraryBundle.getWithIdentifier("com.apple.opengl") which fails
+        // on iOS (no system OpenGL framework) →
+        //   java.lang.UnsatisfiedLinkError: Failed to retrieve bundle with
+        //   identifier: com.apple.opengl
+        // Point opengl.libname at libmobileglues.dylib for Vulkan setups —
+        // MobileGlues is purpose-built for GL-on-Metal/Vulkan on mobile and
+        // already uses our shipped libspirv-cross.dylib for shader translation.
+        // GL.create() finds GL function pointers; if Minecraft ever does call
+        // a GL entry point (compat code, shader build, etc.) MobileGlues can
+        // route it through Vulkan rather than crashing like a context-less
+        // gl4es would.
+        const char *openglLibName = (strcmp(glLibName, RENDERER_NAME_VULKAN) == 0)
+            ? RENDERER_NAME_MOBILEGLUES
+            : glLibName;
+        margv[++margc] = [NSString stringWithFormat:@"-Dorg.lwjgl.opengl.libname=%s", openglLibName].UTF8String;
     }
+
+    // Point LWJGL spvc bindings at libspirv-cross-c-shared.0.dylib (the one
+    // MobileGlues ships and that's already loaded into the process by the
+    // time spvc.<clinit> runs). LWJGL's default would be to dlopen
+    // "libspirv-cross.dylib"; if we ship a separate file with that filename
+    // it collides at dyld registration because both share the install_name
+    // @rpath/libspirv-cross-c-shared.0.dylib. Reusing the already-loaded
+    // C library avoids the duplicate.
+    //
+    // NOTE: LWJGL's Library.loadNative passes the configured libname through
+    // Platform.mapLibraryNameBundled which on macOS prefixes "lib" and
+    // suffixes ".dylib". Pass just the base name "spirv-cross-c-shared.0"
+    // so the result is libspirv-cross-c-shared.0.dylib (not
+    // liblibspirv-cross-c-shared.0.dylib.dylib).
+    margv[++margc] = "-Dorg.lwjgl.spvc.libname=spirv-cross-c-shared.0";
 
     NSString *librariesPath = [NSString stringWithFormat:@"%@/libs", NSBundle.mainBundle.bundlePath];
     margv[++margc] = [NSString stringWithFormat:@"-javaagent:%@/patchjna_agent.jar=", librariesPath].UTF8String;
@@ -264,8 +301,17 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
     margv[++margc] = "-XX:+UnlockExperimentalVMOptions";
     margv[++margc] = "-XX:+DisablePrimordialThreadGuardPages";
 
-    // On iOS 26, use mirror mapped JIT by default
+    // On iOS 26, use mirror mapped JIT by default — but only if the libjvm
+    // supports it. Our iOS-built JDK 25 (jre25-ios-v1) does NOT include the
+    // mirror_mapping HotSpot patch yet, so passing this flag makes the JVM
+    // bail out with "Unrecognized VM option". Skip for Java 25 until we
+    // port the mirror_mapping changes (Phase 2).
+    NSString *currentJavaHome = [NSString stringWithUTF8String:getenv("JAVA_HOME") ?: ""];
+    BOOL isJava25Home = [currentJavaHome containsString:@"java-25"];
     if (@available(iOS 26.0, *)) {
+        // jre25-ios-v2 includes the mirror_mapping HotSpot patch, so we can
+        // enable the flag for Java 25 too. Older Java 25 builds (v1) lacked
+        // it; keeping the suffix check harmless since v2 supports the flag.
         margv[++margc] = "-XX:+MirrorMappedCodeCache";
     }
 
@@ -277,7 +323,11 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
     NSString *libjlipath11 = [NSString stringWithFormat:@"%@/lib/libjli.dylib", javaHome]; // java 11+
     BOOL isJava8 = [fm fileExistsAtPath:libjlipath8];
     setenv("INTERNAL_JLI_PATH", (isJava8 ? libjlipath8 : libjlipath11).UTF8String, 1);
+    NSLog(@"[Bisect] About to dlopen libjli at %s", getenv("INTERNAL_JLI_PATH"));
+    fflush(stdout); fflush(stderr);
     void* libjli = dlopen(getenv("INTERNAL_JLI_PATH"), RTLD_GLOBAL);
+    NSLog(@"[Bisect] dlopen returned %p", libjli);
+    fflush(stdout); fflush(stderr);
 
     if (!libjli) {
         const char *error = dlerror();
