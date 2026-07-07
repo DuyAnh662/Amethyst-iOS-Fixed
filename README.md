@@ -4,7 +4,7 @@ This is a build of AngelAuraAmethyst iOS which has been customized to be able to
 
 If anyone is able or willing to help me fix keyboard support, there is a post about it in Issues. Your help would be greatly appreciated.
 
-Compiling is not recommended and not supported. You have been warned.
+Compiling does work, but is not recommended and not supported. I will not be able to help with any issues you experience when compiling. You have been warned.
 
 Thanks to vibecodest for the source code!
 ## Third party components and their licenses
