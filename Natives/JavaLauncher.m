@@ -1,3 +1,5 @@
+#include <mach/mach.h>
+#include <mach/task.h>
 #include <dirent.h>
 #include <dlfcn.h>
 #include <errno.h>
