@@ -87,33 +87,6 @@ jobs:
           
           gmake -j$(sysctl -n hw.ncpu) dsym package PLATFORM=2 TROLLSTORE_JIT_ENT=1 $SIGN_FLAGS 2> >(grep -v "vtool warning: code signature will be invalid" >&2)
 
-          # POST-BUILD BINARY OPTIMIZATION: Purge invalid structural signature metadata and enforce clean ad-hoc signing via ldid
-          if [ -d "artifacts" ]; then
-            find artifacts -type f \( -name "*.ipa" -o -name "*.tipa" \) | while read -r app_package; do
-              echo "Processing targeted application distribution bundle: $app_package"
-              
-              TMP_DIR=$(mktemp -d)
-              unzip -q "$app_package" -d "$TMP_DIR"
-              
-              find "$TMP_DIR" -type f \( -perm +111 -o -name "*.dylib" -o -name "*.framework" \) | while read -r binary; do
-                if file "$binary" | grep -q "Mach-O"; then
-                  echo "Purging legacy structural signature data and generating ad-hoc schema: $binary"
-                  codesign --remove-signature "$binary" 2>/dev/null || true
-                  ldid -S "$binary" 2>/dev/null || codesign --force --sign - "$binary" 2>/dev/null
-                fi
-              done
-              
-              cd "$TMP_DIR"
-              zip -qry "fixed.zip" .
-              cd -
-              mv "$TMP_DIR/fixed.zip" "$app_package"
-              rm -rf "$TMP_DIR"
-            done
-            echo "/:: Post-build binary optimization successfully executed"
-          else
-            echo "Warning: Target distribution directory 'artifacts' absent. Bypassing validation phase."
-          fi
-
       - name: List artifacts
         if: always()
         run: ls -la artifacts/ || true
