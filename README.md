@@ -2,7 +2,7 @@
 
 This is a build of AngelAuraAmethyst iOS which has been customized to be able to launch Minecraft 26.x.x. This includes the snapshots. Do note that this is completely unofficial. Don't bother the Amethyst devs if something breaks. Instead, post an issue here and i'll look into it. Keyboard is now working thanks to @T1k-T1k and @DuyAnh662. @T1k-T1k also made compiling possible. Huge thanks to both of them. This build bundles a custom lwjgl version and Java 25. It also does not include slimmed versions. Builds are only published in Releases and not in Actions. Builds in Actions are never intended to be used until they become releases. Most older Minecraft versions that use Java 21 will launch with this by selecting Java 25 as the Java version. All versions that use Java 8 work without any special configuration. Versions that use Java 17 do not currently work. Instead, you can install normal Amethyst alongside this version because of different bundle identifiers.
 
-Compiling does work, and is supported, but is still not reccommended. If you compile, add replace lwjgl.jar in the libs section of the built ipa or tipa with the one at the root of this repo.
+Compiling does work, and is supported, but is still not recommended. If you compile, be sure to replace lwjgl.jar in the libs section of the built ipa or tipa with the one at the root of this repo.
 
 Thanks to vibecodest for the source code!
 ## Third party components and their licenses
