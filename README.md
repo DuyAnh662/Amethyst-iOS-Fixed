@@ -1,4 +1,4 @@
-# Fork from: (Catsruledogs)[https://github.com/catsruledogs/Amethyst-iOS-25.git]
+# Fork from: [Catsruledogs](https://github.com/catsruledogs/Amethyst-iOS-25.git) 
 * It was created to fix some bugs that Catsruledogs hadn't yet addressed, then tested and added to Catsruledogs' main repository.
 
 **All the new versions of Minecraft work as of right now, including the 26.3 snapshots. The Keyboard is fixed! Make sure to set your renderer to MobileGlues when you first launch the game! Vulkan does work, just first launch the game using MobileGlues and then change the Prefered Graphics API to Vulkan. There is currently a bug with Sodium and MobileGlues. If someone knows how to fix this, that would be great! There is a post about it in Issues.**
