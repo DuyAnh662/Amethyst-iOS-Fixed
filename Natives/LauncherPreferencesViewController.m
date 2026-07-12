@@ -215,7 +215,23 @@
             @{@"key": @"allow_microphone",
               @"hasDetail": @YES,
               @"icon": @"mic",
-              @"type": self.typeSwitch
+              @"type": self.typeSwitch,
+              @"requestReload": @YES
+            },
+            @{@"key": @"microphone_source",
+              @"hasDetail": @YES,
+              @"icon": @"mic.badge.plus",
+              @"type": self.typePickField,
+              @"enableCondition": ^BOOL(){
+                  return [getPrefObject(@"video.allow_microphone") boolValue];
+              },
+              @"pickKeys": @[@"auto", @"front", @"bottom", @"back"],
+              @"pickList": @[
+                  localize(@"preference.title.microphone_source-auto", nil),
+                  localize(@"preference.title.microphone_source-front", nil),
+                  localize(@"preference.title.microphone_source-bottom", nil),
+                  localize(@"preference.title.microphone_source-back", nil)
+              ]
             },
         ], @[
             // Control settings

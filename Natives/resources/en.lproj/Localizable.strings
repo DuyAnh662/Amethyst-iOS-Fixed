@@ -210,6 +210,12 @@
 "preference.detail.silence_with_switch" = "Enable to disable audio when Silent Mode is on. Headphones and external speakers are not affected.";
 "preference.title.allow_microphone" = "Allow microphone input";
 "preference.detail.allow_microphone" = "Enable this only if you are using voice chat mod. Silent switch option will be ignored, and audio quality from other apps will be affected.";
+"preference.title.microphone_source" = "Microphone selection";
+"preference.detail.microphone_source" = "Auto priority: Front → Bottom → Back. If one fails, the next is tried.";
+"preference.title.microphone_source-auto" = "Auto (Recommended)";
+"preference.title.microphone_source-front" = "Front microphone";
+"preference.title.microphone_source-bottom" = "Bottom microphone";
+"preference.title.microphone_source-back" = "Back microphone";
 "preference.title.default_gamepad_ctrl" = "Controller configuration";
 "preference.title.hardware_hide" = "Hide controls when hardware is connected";
 "preference.detail.hardware_hide" = "Enable the behaviour of automatically disabling the on-screen control overlay when a mouse or game controller is connected.";

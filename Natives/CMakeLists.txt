@@ -18,7 +18,7 @@ include_directories(
   "external/AFNetworking/UIKit+AFNetworking"
   "external/DBNumberedSlider/Classes"
   "external/NRFileManager"
-  "external/UnzipKit"
+  "external/UnzipKit/Source"
   "external/fishhook"
   "external/lzma"
   "external/mesa"

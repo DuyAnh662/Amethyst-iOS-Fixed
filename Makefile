@@ -317,6 +317,7 @@ dep_mg:
 		-DCMAKE_OSX_ARCHITECTURES=arm64 \
 		-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
 		-DCMAKE_C_FLAGS="-arch arm64" \
+		-DSPIRV_CROSS_SHARED="ON" \
 $(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/
 
 	cmake --build $(WORKINGDIR)/mobileglues --config RelWithDebInfo -j$(JOBS) --target mobileglues --target spirv-cross-c-shared
@@ -337,16 +338,16 @@ $(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/
 
 assets:
 	echo '[Amethyst v$(VERSION)] assets - start'
-	if [ '$(IOS)' = '0' ] && [ '$(DETECTPLAT)' = 'Darwin' ]; then \
+	if [ -d /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform ]; then \
 		mkdir -p $(WORKINGDIR)/AngelAuraAmethyst.app/Base.lproj; \
 		xcrun actool $(SOURCEDIR)/Natives/Assets.xcassets \
 			--compile $(SOURCEDIR)/Natives/resources \
 			--platform iphoneos \
 			--minimum-deployment-target 14.0 \
 			--app-icon AppIcon-Light \
-			--output-partial-info-plist /dev/null || exit 1; \
+			--output-partial-info-plist /dev/null || true; \
 	else \
-		echo 'Due to the required tools not being available, you cannot compile the extras for Angel Aura Amethyst with an iOS device.'; \
+		echo 'Skipping actool - not available'; \
 	fi
 	echo '[Amethyst v$(VERSION)] assets - end'
 

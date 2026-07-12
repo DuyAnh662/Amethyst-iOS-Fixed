@@ -30,6 +30,11 @@ public class PatchJNAAgent implements ClassFileTransformer {
     }
 
     private static byte[] patchReturnMethod(byte[] classBytes, String methodName, String methodDesc, boolean returnValue) {
+        byte[] newCode = returnValue ? new byte[]{0x04, (byte) 0xAC} : new byte[]{0x03, (byte) 0xAC};
+        return patchMethod(classBytes, methodName, methodDesc, newCode);
+    }
+
+    private static byte[] patchMethod(byte[] classBytes, String methodName, String methodDesc, byte[] newCode) {
         try {
             DataInputStream dis = new DataInputStream(new ByteArrayInputStream(classBytes));
             if (dis.readInt() != 0xCAFEBABE) return classBytes;
@@ -73,7 +78,7 @@ public class PatchJNAAgent implements ClassFileTransformer {
             System.arraycopy(classBytes, 0, header, 0, header.length);
             dos.write(header);
 
-            byte[] newCode = returnValue ? new byte[]{0x04, (byte) 0xAC} : new byte[]{0x03, (byte) 0xAC};
+            int codeAttrLen = 12 + newCode.length;
 
             for (int mi = 0; mi < mc; mi++) {
                 int acc = dis.readUnsignedShort();
@@ -94,7 +99,7 @@ public class PatchJNAAgent implements ClassFileTransformer {
                     } else {
                         dos.writeShort(nameIdx);
                     }
-                    dos.writeInt(12);
+                    dos.writeInt(codeAttrLen);
                     dos.writeShort(1);
                     dos.writeShort(0);
                     dos.writeInt(newCode.length);

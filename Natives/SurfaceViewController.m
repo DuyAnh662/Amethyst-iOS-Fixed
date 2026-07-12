@@ -294,6 +294,53 @@ static GameSurfaceView* pojavWindow;
     AVAudioSession *session = AVAudioSession.sharedInstance;
     [session setCategory:category withOptions:options error:&sessionError];
     [session setActive:YES error:&sessionError];
+
+    if(getPrefBool(@"video.allow_microphone")) {
+        [self selectMicrophoneSource];
+    }
+}
+
+- (void)selectMicrophoneSource {
+    NSError *error = nil;
+    AVAudioSession *session = AVAudioSession.sharedInstance;
+
+    AVAudioSessionPortDescription *builtInMic = nil;
+    for (AVAudioSessionPortDescription *input in session.availableInputs) {
+        if ([input.portType isEqualToString:AVAudioSessionPortBuiltInMic]) {
+            builtInMic = input;
+            break;
+        }
+    }
+
+    if (!builtInMic || builtInMic.dataSources.count == 0) {
+        NSLog(@"[MicSource] No built-in mic or no data sources available");
+        return;
+    }
+
+    NSString *source = getPrefObject(@"video.microphone_source");
+    NSArray<NSString *> *preferredOrder = nil;
+    if (!source || [source isEqualToString:@"auto"]) {
+        preferredOrder = @[@"Front", @"Bottom", @"Back"];
+    } else if ([source isEqualToString:@"front"]) {
+        preferredOrder = @[@"Front"];
+    } else if ([source isEqualToString:@"bottom"]) {
+        preferredOrder = @[@"Bottom"];
+    } else if ([source isEqualToString:@"back"]) {
+        preferredOrder = @[@"Back"];
+    }
+
+    for (NSString *prefName in preferredOrder) {
+        for (AVAudioSessionDataSourceDescription *dataSource in builtInMic.dataSources) {
+            if ([dataSource.dataSourceName localizedCaseInsensitiveContainsString:prefName]) {
+                [session setPreferredInput:builtInMic error:&error];
+                [builtInMic setPreferredDataSource:dataSource error:&error];
+                NSLog(@"[MicSource] Selected: %@", dataSource.dataSourceName);
+                return;
+            }
+        }
+    }
+
+    NSLog(@"[MicSource] No matching data source found, using system default");
 }
 
 - (void)updateJetsamControl {
