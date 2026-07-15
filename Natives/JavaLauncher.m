@@ -51,6 +51,9 @@ void init_loadDefaultEnv() {
     // Override OpenGL version to 4.1 for Zink
     setenv("MESA_GL_VERSION_OVERRIDE", "4.1", 1);
 
+    // Suppress [mvk-info] log spam (swapchain creation, etc.)
+    setenv("MVK_CONFIG_LOG_LEVEL", "2", 1);
+
     // Runs JVM in a separate thread
     setenv("HACK_IGNORE_START_ON_FIRST_THREAD", "1", 1);
 }
@@ -74,8 +77,11 @@ void init_loadCustomEnv() {
 
 void init_loadMobileGluesConfig() {
     NSString *renderer = [PLProfiles resolveKeyForCurrentProfile:@"renderer"];
-    if (![renderer isEqualToString:@ RENDERER_NAME_MOBILEGLUES] &&
-        ![renderer isEqualToString:@"auto"]) {
+    BOOL usesMobileGlues = [renderer isEqualToString:@ RENDERER_NAME_MOBILEGLUES] ||
+        [renderer isEqualToString:@"auto"] ||
+        [renderer isEqualToString:@ RENDERER_NAME_VULKAN];
+
+    if (!usesMobileGlues) {
         return;
     }
 
@@ -83,6 +89,12 @@ void init_loadMobileGluesConfig() {
     setenv("MG_DIR_PATH", mgDirPath.UTF8String, 1);
 
     NSMutableDictionary *config = [NSMutableDictionary dictionary];
+
+    // Set safe defaults for compatibility, then let user preferences override
+    config[@"enableExtGL43"] = @1;
+    config[@"enableExtDirectStateAccess"] = @1;
+    config[@"maxGlslCacheSize"] = @128;
+    config[@"customGLVersion"] = @0x030100;
 
     id enableAngle = getPrefObject(@"mobileglues.enable_angle");
     if (enableAngle) config[@"enableANGLE"] = [enableAngle boolValue] ? @1 : @0;
@@ -110,16 +122,18 @@ void init_loadMobileGluesConfig() {
 
     id customGlVersion = getPrefObject(@"mobileglues.custom_gl_version");
     if (customGlVersion) {
-        int version = 0;
         NSString *verStr = [customGlVersion description];
-        if ([verStr isEqualToString:@"4.0"]) version = 0x040000;
-        else if ([verStr isEqualToString:@"4.1"]) version = 0x040100;
-        else if ([verStr isEqualToString:@"4.2"]) version = 0x040200;
-        else if ([verStr isEqualToString:@"4.3"]) version = 0x040300;
-        else if ([verStr isEqualToString:@"4.4"]) version = 0x040400;
-        else if ([verStr isEqualToString:@"4.5"]) version = 0x040500;
-        else if ([verStr isEqualToString:@"4.6"]) version = 0x040600;
-        config[@"customGLVersion"] = @(version);
+        if ([verStr isEqualToString:@"3.0"]) config[@"customGLVersion"] = @0x030000;
+        else if ([verStr isEqualToString:@"3.1"]) config[@"customGLVersion"] = @0x030100;
+        else if ([verStr isEqualToString:@"3.2"]) config[@"customGLVersion"] = @0x030200;
+        else if ([verStr isEqualToString:@"3.3"]) config[@"customGLVersion"] = @0x030300;
+        else if ([verStr isEqualToString:@"4.0"]) config[@"customGLVersion"] = @0x040000;
+        else if ([verStr isEqualToString:@"4.1"]) config[@"customGLVersion"] = @0x040100;
+        else if ([verStr isEqualToString:@"4.2"]) config[@"customGLVersion"] = @0x040200;
+        else if ([verStr isEqualToString:@"4.3"]) config[@"customGLVersion"] = @0x040300;
+        else if ([verStr isEqualToString:@"4.4"]) config[@"customGLVersion"] = @0x040400;
+        else if ([verStr isEqualToString:@"4.5"]) config[@"customGLVersion"] = @0x040500;
+        else if ([verStr isEqualToString:@"4.6"]) config[@"customGLVersion"] = @0x040600;
     }
 
     id fsr1Setting = getPrefObject(@"mobileglues.fsr1_setting");
@@ -336,6 +350,11 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
         // a GL entry point (compat code, shader build, etc.) MobileGlues can
         // route it through Vulkan rather than crashing like a context-less
         // gl4es would.
+        if (strcmp(glLibName, RENDERER_NAME_VULKAN) == 0) {
+            setenv("MVK_CONFIG_RESUME_LOST_DEVICE", "1", 1);
+            setenv("MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS", "1", 1);
+            setenv("MVK_CONFIG_PREFILL_METAL_COMMAND_BUFFERS", "1", 1);
+        }
         const char *openglLibName = (strcmp(glLibName, RENDERER_NAME_VULKAN) == 0)
             ? RENDERER_NAME_MOBILEGLUES
             : glLibName;

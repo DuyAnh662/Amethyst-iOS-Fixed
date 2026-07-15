@@ -14,3 +14,5 @@ project.xcworkspace/
 /Natives/config.h
 entitlements.codesign.xml
 /Compare
+/.rule/
+/sample/

@@ -151,20 +151,22 @@ NSArray* getRendererKeys(BOOL containsDefault) {
 }
 
 NSArray* getRendererNames(BOOL containsDefault) {
-    NSMutableArray *array;
-
-    array = @[
+    NSMutableArray *array = [NSMutableArray array];
+    if (containsDefault) {
+        [array addObject:@"(default)"];
+    }
+    NSString *names[] = {
         localize(@"preference.title.renderer.debug.auto", nil),
         localize(@"preference.title.renderer.debug.gl4es", nil),
         localize(@"preference.title.renderer.debug.angle", nil),
         localize(@"preference.title.renderer.debug.mg", nil),
         localize(@"preference.title.renderer.debug.zink", nil),
         localize(@"preference.title.renderer.debug.vulkan", nil)
-    ].mutableCopy;
-
-    if (containsDefault) {
-        [array insertObject:@"(default)" atIndex:0];
+    };
+    for (int i = 0; i < sizeof(names)/sizeof(names[0]); i++) {
+        if (names[i]) {
+            [array addObject:names[i]];
+        }
     }
-
     return array;
 }

@@ -92,6 +92,14 @@ add_library(AmethystAccountJNI SHARED
 )
 target_link_libraries(AmethystAccountJNI)
 
+# Audio capture JNI bridge
+add_library(audio_capture SHARED
+  audio_capture_bridge.m
+)
+target_link_libraries(audio_capture
+  "-framework AVFoundation"
+)
+
 # Angel Aura Amethyst
 add_executable(AngelAuraAmethyst
   dyld_bypass_validation.m

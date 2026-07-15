@@ -96,18 +96,19 @@ NSError* saveJSONToFile(NSDictionary *dict, NSString *path) {
 }
 
 NSString* localize(NSString* key, NSString* comment) {
+    if (!key) return @"";
     NSString *value = NSLocalizedString(key, nil);
+    if (!value) value = @"";
     if (![NSLocale.preferredLanguages[0] isEqualToString:@"en"] && [value isEqualToString:key]) {
         NSString* path = [NSBundle.mainBundle pathForResource:@"en" ofType:@"lproj"];
         NSBundle* languageBundle = [NSBundle bundleWithPath:path];
-        value = [languageBundle localizedStringForKey:key value:nil table:nil];
-
-        if ([value isEqualToString:key]) {
-            value = [[NSBundle bundleWithIdentifier:@"com.apple.UIKit"] localizedStringForKey:key value:nil table:nil];
+        value = [languageBundle localizedStringForKey:key value:@"" table:nil];
+        if (!value || [value isEqualToString:key]) {
+            value = [[NSBundle bundleWithIdentifier:@"com.apple.UIKit"] localizedStringForKey:key value:@"" table:nil];
         }
     }
 
-    return value;
+    return value ?: @"";
 }
 
 void customNSLog(const char *file, int lineNumber, const char *functionName, NSString *format, ...)

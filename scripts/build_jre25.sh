@@ -9,7 +9,7 @@
 
 set -euo pipefail
 
-JRE_URL="${JRE_URL:-https://github.com/vibecodest/Amethyst-iOS/releases/download/jre25-ios-v10/jre25-ios-arm64-20260509-release.tar.xz}"
+JRE_URL="${JRE_URL:-https://assets.angelauramc.dev/openjdk/ios-arm64/jre25-ios-aarch64.zip}"
 DEST_DIR="${DEST_DIR:-$(cd "$(dirname "$0")/.." && pwd)/depends/java-25-openjdk}"
 WORK_DIR="${WORK_DIR:-$(mktemp -d -t jre25-XXXXXX)}"
 

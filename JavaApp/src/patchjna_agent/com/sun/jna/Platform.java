@@ -78,13 +78,26 @@ public final class Platform {
     static {
         matchingClassNames.add("de.maxhenkel.voicechat.config.ClientConfig");
         matchingClassNames.add("de.maxhenkel.voicechat.VoicechatClient");
-        matchingClassNames.add("de.maxhenkel.voicechat.voice.client.microphone.MicrophoneManager");
+        // MicrophoneManager removed: on iOS, OpenAL AudioUnit capture is broken,
+        // so we let isMac() return true so the mod uses Java microphone (javax.sound via AVFoundation)
+        // matchingClassNames.add("de.maxhenkel.voicechat.voice.client.microphone.MicrophoneManager");
         matchingClassNames.add("de.maxhenkel.voicechat.macos.VersionCheck");
-        matchingClassNames.add("de.maxhenkel.voicechat.natives.NativeValidator");
+        // NativeValidator removed: on iOS, macOS native dylibs (Opus, LAME, RNNoise, Speex)
+        // are incompatible and crash with SIGILL. Removing this lets isMac() return true,
+        // which causes NativeValidator to check macOS version via VersionCheck and skip.
+        // The mod falls back to pure Java Opus (Concentus) for voice chat.
+        // matchingClassNames.add("de.maxhenkel.voicechat.natives.NativeValidator");
         matchingClassNames.add("de.maxhenkel.voicechat.natives.OpusManager");
         matchingClassNames.add("de.maxhenkel.voicechat.natives.LameManager");
         matchingClassNames.add("de.maxhenkel.voicechat.natives.RNNoiseManager");
         matchingClassNames.add("de.maxhenkel.voicechat.natives.SpeexManager");
+        matchingClassNames.add("de.maxhenkel.opus4j.OpusDecoder");
+        matchingClassNames.add("de.maxhenkel.opus4j.OpusEncoder");
+        matchingClassNames.add("de.maxhenkel.voicechat.plugins.impl.opus.NativeOpusDecoderImpl");
+        matchingClassNames.add("de.maxhenkel.voicechat.plugins.impl.opus.NativeOpusEncoderImpl");
+        matchingClassNames.add("de.maxhenkel.voicechat.voice.client.AudioChannel");
+        matchingClassNames.add("de.maxhenkel.voicechat.voice.client.AudioEncoder");
+        matchingClassNames.add("de.maxhenkel.voicechat.voice.client.MicrophoneThread");
         matchingClassNames.add("su.plo.voice.client.audio.device.VoiceDeviceManager");
     }
 

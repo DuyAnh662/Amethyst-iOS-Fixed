@@ -283,16 +283,18 @@ static GameSurfaceView* pojavWindow;
     if(getPrefBool(@"video.allow_microphone")) {
         category = AVAudioSessionCategoryPlayAndRecord;
         options |= AVAudioSessionCategoryOptionAllowAirPlay | AVAudioSessionCategoryOptionAllowBluetoothA2DP | AVAudioSessionCategoryOptionDefaultToSpeaker;
-    } else if(getPrefBool(@"video.silence_with_switch")) {
-        category = AVAudioSessionCategorySoloAmbient;
     } else {
-        category = AVAudioSessionCategoryPlayback;
+        category = AVAudioSessionCategoryPlayAndRecord;
+        options |= AVAudioSessionCategoryOptionDefaultToSpeaker;
     }
     if(!getPrefBool(@"video.silence_other_audio")) {
         options |= AVAudioSessionCategoryOptionMixWithOthers;
     }
     AVAudioSession *session = AVAudioSession.sharedInstance;
     [session setCategory:category withOptions:options error:&sessionError];
+    [session setPreferredSampleRate:48000.0 error:&sessionError];
+    [session setPreferredIOBufferDuration:0.005 error:&sessionError];
+    [session setMode:AVAudioSessionModeVoiceChat error:&sessionError];
     [session setActive:YES error:&sessionError];
 
     if(getPrefBool(@"video.allow_microphone")) {

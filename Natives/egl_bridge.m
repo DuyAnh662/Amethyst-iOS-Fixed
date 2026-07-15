@@ -117,7 +117,11 @@ void* pojavCreateContext(basic_render_window_t* contextSrc) {
         pojavInitOpenGL();
     }
 
-    return br_init_context(contextSrc);
+    basic_render_window_t* ctx = br_init_context(contextSrc);
+    if (ctx) {
+        pojavMakeCurrent(ctx);
+    }
+    return ctx;
 }
 
 void pojavSwapInterval(int interval) {
